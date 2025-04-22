@@ -6,11 +6,12 @@ pub mod charset;
 pub mod engine;
 pub mod lexer;
 pub mod parser;
+pub mod lua;
 
 pub use self::{
     ast::{AstNode, Quantifier},
     charset::CharSet,
-    engine::find_first_match,
+    lua::find,
     lexer::{Lexer, Token},
     parser::Parser,
 };
@@ -19,7 +20,7 @@ pub use self::{
 pub enum Error {
     Lexer(String),
     Parser(String),
-    Matcher(String),
+    Matcher(String), // TODO: Maybe remove Matcher variant if engine returns Option/Result
 }
 
 impl std::fmt::Display for Error {
@@ -32,4 +33,5 @@ impl std::fmt::Display for Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub const LUA_MAXCAPTURES: usize = 32; // TODO: remove it??
+pub const LUA_MAXCAPTURES: usize = 32;
+

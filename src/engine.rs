@@ -17,6 +17,7 @@ pub fn find_first_match(
     start_index: usize,
 ) -> Result<Option<(Range<usize>, Vec<Option<Range<usize>>>)>> {
     let input_len = input.len();
+    
     if start_index > input_len {
         // Lua allows start > len for matching empty patterns at the end
         // Let the loop handle this. If start_index is way too large, it won't loop.
@@ -70,9 +71,13 @@ fn match_recursive(ast: &[AstNode], mut state: State) -> Option<State> {
             }
         }
         AstNode::Any => {
-            if state.current_byte().is_some() {
-                state.current_pos += 1;
-                match_recursive(remaining_ast, state)
+            if let Some(bytes_remaining) = state.input.get(state.current_pos..) {
+                if let Some(ch) = std::str::from_utf8(bytes_remaining).ok().and_then(|s| s.chars().next()) {
+                    state.current_pos += ch.len_utf8();
+                    match_recursive(remaining_ast, state)
+                } else {
+                    None
+                }
             } else {
                 None
             }
@@ -263,7 +268,7 @@ fn match_non_greedy_quantifier(
 mod tests {
     use std::ops::Range;
 
-    use crate::{LUA_MAXCAPTURES, Parser, Result, find_first_match};
+    use crate::{LUA_MAXCAPTURES, Parser, Result, engine::find_first_match};
 
     fn find(
         pattern_str: &str,
@@ -607,8 +612,8 @@ mod tests {
 
     #[test]
     fn test_pattern_with_utf8_content_engine() {
-        assert_match(".", "привет", 0..1, &[]);
-        assert_match("..", "привет", 0..2, &[]);
+        assert_match(".", "привет", 0..2, &[]);
+        assert_match("..", "привет", 0..4, &[]);
         assert_match("[%w]+", "привет123", 12..15, &[]);
         assert_match("%a+", "hello привет", 0..5, &[]);
     }
