@@ -36,12 +36,10 @@ pub fn find(
 
         if pattern.is_empty() {
             cfg_if! {
-                if #[cfg(all(feature = "1-based", not(feature = "0-based")))] {
+                if #[cfg(feature = "1-based")] {
                     return Ok(Some((start_byte_index + 1, start_byte_index, vec![]))); // 1-based
-                } else if #[cfg(all(feature = "0-based", not(feature = "1-based")))] {
-                    return Ok(Some((start_byte_index, start_byte_index, vec![]))); // 0-based
                 } else {
-                    compile_error!("supports only 1-based and 0-based indices")
+                    return Ok(Some((start_byte_index, start_byte_index, vec![]))); // 0-based
                 }
             }
         }
@@ -54,12 +52,10 @@ pub fn find(
             let end_pos = start_pos + pattern.len() - 1; // End position is inclusive in Lua
 
             cfg_if! {
-                if #[cfg(all(feature = "1-based", not(feature = "0-based")))] {
+                if #[cfg(feature = "1-based")] {
                     Ok(Some((start_pos + 1, end_pos + 1, vec![]))) // 1-based
-                } else if #[cfg(all(feature = "0-based", not(feature = "1-based")))] {
+                } else  {
                     Ok(Some((start_pos, end_pos, vec![]))) // 0-based
-                } else {
-                    compile_error!("supports only 1-based and 0-based indices")
                 }
             }
         } else {
@@ -83,12 +79,10 @@ pub fn find(
                     .collect();
 
                 cfg_if! {
-                    if #[cfg(all(feature = "1-based", not(feature = "0-based")))] {
+                    if #[cfg(feature = "1-based")] {
                         Ok(Some((start_pos + 1, end_pos + 1, captured_strings))) // 1-based
-                    } else if #[cfg(all(feature = "0-based", not(feature = "1-based")))] {
-                        Ok(Some((start_pos, end_pos, captured_strings))) // 0-based
                     } else {
-                        compile_error!("supports only 1-based and 0-based indices")
+                        Ok(Some((start_pos, end_pos, captured_strings))) // 0-based
                     }
                 }
             }
