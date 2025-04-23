@@ -9,7 +9,6 @@ pub fn gmatch<'a>(
     text: &'a str,
     pattern: &str,
 ) -> Result<impl Iterator<Item = Result<Vec<String>>> + 'a> {
-    // Check for empty pattern
     let is_empty_pattern = pattern.is_empty();
 
     let pattern_ast = if is_empty_pattern {
@@ -46,9 +45,9 @@ impl Iterator for GMatchIterator<'_> {
 
         if self.is_empty_pattern {
             let result = Some(Ok(vec![String::new()]));
-            
+
             self.current_pos += 1;
-            
+
             return result;
         }
 

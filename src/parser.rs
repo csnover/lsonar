@@ -175,9 +175,7 @@ impl Parser {
             Token::Percent => Err(Error::Parser(
                 "internal error: Percent token should not reach parser base".to_string(),
             )),
-            Token::CaptureRef(_) => Err(Error::Parser(
-                "invalid pattern (capture reference %n not allowed here)".to_string(),
-            )),
+            Token::CaptureRef(n) => Ok(AstNode::CaptureRef(n as usize)),
         }
     }
 
@@ -662,7 +660,9 @@ mod tests {
             matches!(parse_err("%f[a"), Err(Error::Parser(s)) if s.contains("unfinished character class"))
         );
         assert!(matches!(parse_err("%z"), Err(Error::Lexer(_))));
-        assert!(matches!(parse_err("%1"), Err(Error::Parser(s)) if s.contains("not allowed here")));
+
+        assert_eq!(parse_ok("%1"), vec![AstNode::CaptureRef(1)]);
+
         let too_many_captures = "()".repeat(LUA_MAXCAPTURES + 1);
         assert!(
             matches!(parse_err(&too_many_captures), Err(Error::Parser(s)) if s.contains("too many captures"))

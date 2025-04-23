@@ -129,6 +129,12 @@ fn match_recursive(ast: &[AstNode], mut state: State) -> Option<State> {
             None
         }
 
+        AstNode::CaptureRef(_) => {
+            // CaptureRef не имеет смысла в контексте сопоставления паттернов
+            // Это используется только в строке замены для gsub
+            None
+        }
+
         AstNode::Balanced(b1, b2) => {
             if state.current_byte() != Some(*b1) {
                 return None;
