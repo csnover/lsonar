@@ -4,32 +4,32 @@ pub mod token;
 
 pub use token::Token;
 
-fn is_class_char(c: u8) -> bool {
+fn is_class_byte(c: u8) -> bool {
     matches!(
-        c as char,
-        'a' | 'c'
-            | 'd'
-            | 'g'
-            | 'l'
-            | 'p'
-            | 's'
-            | 'u'
-            | 'w'
-            | 'x'
-            | 'A'
-            | 'C'
-            | 'D'
-            | 'G'
-            | 'L'
-            | 'P'
-            | 'S'
-            | 'U'
-            | 'W'
-            | 'X'
+        c,
+        b'a' | b'c'
+            | b'd'
+            | b'g'
+            | b'l'
+            | b'p'
+            | b's'
+            | b'u'
+            | b'w'
+            | b'x'
+            | b'A'
+            | b'C'
+            | b'D'
+            | b'G'
+            | b'L'
+            | b'P'
+            | b'S'
+            | b'U'
+            | b'W'
+            | b'X'
     )
 }
 
-fn is_escapable_magic_char(c: u8) -> bool {
+fn is_escapable_magic_byte(c: u8) -> bool {
     matches!(
         c,
         b'(' | b')' | b'.' | b'%' | b'[' | b']' | b'*' | b'+' | b'-' | b'?' | b'^' | b'$'
@@ -93,9 +93,9 @@ impl<'a> Lexer<'a> {
             b'%' => {
                 if self.in_set {
                     if let Some(next_byte_peek) = self.peek() {
-                        if is_class_char(next_byte_peek) {
+                        if is_class_byte(next_byte_peek) {
                             self.advance();
-                            Ok(Some(Token::Class(next_byte_peek as char)))
+                            Ok(Some(Token::Class(next_byte_peek)))
                         } else {
                             Ok(Some(Token::Literal(b'%')))
                         }
@@ -111,8 +111,8 @@ impl<'a> Lexer<'a> {
                         ));
                     };
                     match next_byte {
-                        c if is_escapable_magic_char(c) => Ok(Some(Token::Literal(c))),
-                        c if is_class_char(c) => Ok(Some(Token::Class(c as char))),
+                        c if is_escapable_magic_byte(c) => Ok(Some(Token::Literal(c))),
+                        c if is_class_byte(c) => Ok(Some(Token::Class(c))),
                         b'b' => {
                             let Some(d1) = self.advance() else {
                                 return Err(Error::Lexer(
@@ -129,8 +129,8 @@ impl<'a> Lexer<'a> {
                         b'f' => Ok(Some(Token::Frontier)),
                         d @ b'1'..=b'9' => Ok(Some(Token::CaptureRef(d - b'0'))),
                         _ => Err(Error::Lexer(format!(
-                            "malformed pattern (invalid use of '%%' in pattern: %{})",
-                            next_byte as char
+                            "malformed pattern (invalid use of '%%' in pattern: %{:?})",
+                            next_byte
                         ))),
                     }
                 }
@@ -201,7 +201,7 @@ mod tests {
         assert_eq!(lex_all("%%")?, vec![Token::Literal(b'%')]);
         assert_eq!(
             lex_all("%.%a")?,
-            vec![Token::Literal(b'.'), Token::Class('a')]
+            vec![Token::Literal(b'.'), Token::Class(b'a')]
         );
         assert_eq!(lex_all("%(")?, vec![Token::Literal(b'(')]);
         assert_eq!(lex_all("%)")?, vec![Token::Literal(b')')]);
@@ -221,31 +221,31 @@ mod tests {
         assert_eq!(
             lex_all("%a%d%l%s%u%w%x%p%c%g")?,
             vec![
-                Token::Class('a'),
-                Token::Class('d'),
-                Token::Class('l'),
-                Token::Class('s'),
-                Token::Class('u'),
-                Token::Class('w'),
-                Token::Class('x'),
-                Token::Class('p'),
-                Token::Class('c'),
-                Token::Class('g')
+                Token::Class(b'a'),
+                Token::Class(b'd'),
+                Token::Class(b'l'),
+                Token::Class(b's'),
+                Token::Class(b'u'),
+                Token::Class(b'w'),
+                Token::Class(b'x'),
+                Token::Class(b'p'),
+                Token::Class(b'c'),
+                Token::Class(b'g')
             ]
         );
         assert_eq!(
             lex_all("%A%D%L%S%U%W%X%P%C%G")?,
             vec![
-                Token::Class('A'),
-                Token::Class('D'),
-                Token::Class('L'),
-                Token::Class('S'),
-                Token::Class('U'),
-                Token::Class('W'),
-                Token::Class('X'),
-                Token::Class('P'),
-                Token::Class('C'),
-                Token::Class('G')
+                Token::Class(b'A'),
+                Token::Class(b'D'),
+                Token::Class(b'L'),
+                Token::Class(b'S'),
+                Token::Class(b'U'),
+                Token::Class(b'W'),
+                Token::Class(b'X'),
+                Token::Class(b'P'),
+                Token::Class(b'C'),
+                Token::Class(b'G')
             ]
         );
         Ok(())
@@ -280,7 +280,7 @@ mod tests {
             vec![
                 Token::LParen,
                 Token::Literal(b'a'),
-                Token::Class('d'),
+                Token::Class(b'd'),
                 Token::Plus,
                 Token::RParen,
                 Token::CaptureRef(1),

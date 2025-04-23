@@ -1,18 +1,19 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::manual_is_ascii_check)]
+#![allow(unused)] // TODO: temporarily, to be removed after all functions have been implemented
 
 pub mod ast;
 pub mod charset;
 pub mod engine;
 pub mod lexer;
-pub mod parser;
 pub mod lua;
+pub mod parser;
 
 pub use self::{
     ast::{AstNode, Quantifier},
     charset::CharSet,
-    lua::find,
     lexer::{Lexer, Token},
+    lua::find,
     parser::Parser,
 };
 
@@ -34,4 +35,3 @@ impl std::fmt::Display for Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub const LUA_MAXCAPTURES: usize = 32;
-

@@ -5,7 +5,7 @@ pub enum AstNode {
     // Basic matching units
     Literal(u8),
     Any,               // .
-    Class(char, bool), // Class char (e.g., 'a'), negated? (e.g. %A -> ('a', true))
+    Class(u8, bool),   // Class byte (e.g., b'a'), negated? (e.g. %A -> (b'a', true))
     Set(CharSet),      // Represents [...] or [^...]. CharSet handles negation internally.
     Balanced(u8, u8),  // %bxy
     Frontier(CharSet), // %f[...]
