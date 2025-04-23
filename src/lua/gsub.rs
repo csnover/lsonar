@@ -16,7 +16,6 @@ pub fn gsub<'a>(
     let text_bytes = text.as_bytes();
     let byte_len = text_bytes.len();
 
-    // Парсим паттерн поиска
     let mut parser = Parser::new(pattern)?;
     let pattern_ast = parser.parse()?;
 

@@ -130,8 +130,6 @@ fn match_recursive(ast: &[AstNode], mut state: State) -> Option<State> {
         }
 
         AstNode::CaptureRef(_) => {
-            // CaptureRef не имеет смысла в контексте сопоставления паттернов
-            // Это используется только в строке замены для gsub
             None
         }
 

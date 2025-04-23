@@ -107,7 +107,6 @@ mod tests {
             "a5b"
         );
 
-        // Индекс больше числа захватов
         assert_eq!(process_replacement_string("%9", &["capture"]).unwrap(), "");
     }
 }
