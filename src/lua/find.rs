@@ -1,4 +1,7 @@
-use super::super::{Parser, Result, engine::find_first_match};
+use super::{
+    super::{Parser, Result, engine::find_first_match},
+    calculate_start_index,
+};
 use cfg_if::cfg_if;
 
 /// Corresponds to Lua 5.3 [`string.find`].
@@ -12,22 +15,7 @@ pub fn find(
     let text_bytes = text.as_bytes();
     let byte_len = text_bytes.len();
 
-    let start_byte_index = match init {
-        Some(i) if i > 0 => {
-            let i = if cfg!(feature = "1-based") { i - 1 } else { i };
-            let i = i as usize;
-            if i >= byte_len { byte_len } else { i }
-        }
-        Some(i) if i < 0 => {
-            let abs_i = (-i) as usize;
-            if abs_i > byte_len {
-                0
-            } else {
-                byte_len.saturating_sub(abs_i)
-            }
-        }
-        _ => 0,
-    };
+    let start_byte_index = calculate_start_index(byte_len, init);
 
     if plain {
         if start_byte_index >= byte_len && !pattern.is_empty() {
