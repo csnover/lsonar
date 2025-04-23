@@ -13,7 +13,7 @@ pub use self::{
     ast::{AstNode, Quantifier},
     charset::CharSet,
     lexer::{Lexer, Token},
-    lua::find,
+    lua::{find, gmatch, gsub, Repl, r#match},
     parser::Parser,
 };
 
