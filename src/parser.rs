@@ -6,6 +6,28 @@ use super::{
 };
 use std::iter::Peekable;
 
+const fn token_to_byte(token: &Token) -> Option<u8> {
+    match token {
+        Token::Literal(b) => Some(*b),
+        Token::Any => Some(b'.'),
+        Token::LParen => Some(b'('),
+        Token::RParen => Some(b')'),
+        Token::LBracket => Some(b'['),
+        Token::RBracket => Some(b']'),
+        Token::Caret => Some(b'^'),
+        Token::Dollar => Some(b'$'),
+        Token::Star => Some(b'*'),
+        Token::Plus => Some(b'+'),
+        Token::Question => Some(b'?'),
+        Token::Minus => Some(b'-'),
+        Token::Percent => Some(b'%'),
+        Token::Class(c) => Some(*c),
+        Token::Balanced(_, _) => Some(b'b'),
+        Token::Frontier => Some(b'f'),
+        Token::CaptureRef(d) => Some(b'0' + *d),
+    }
+}
+
 pub struct Parser {
     tokens: Peekable<std::vec::IntoIter<Token>>,
     capture_count: usize,
@@ -109,12 +131,13 @@ impl Parser {
             Token::Dollar => Ok(AstNode::AnchorEnd),
 
             Token::Class(c) => {
-                let negated = c.is_uppercase();
-                let base_char = c.to_ascii_lowercase();
-                if "acdgplsuxw".contains(base_char) {
-                    Ok(AstNode::Class(base_char, negated))
+                let negated = c.is_ascii_uppercase();
+                let base_byte = if negated { c.to_ascii_lowercase() } else { c };
+                if [b'a', b'c', b'd', b'g', b'l', b'p', b's', b'u', b'w', b'x'].contains(&base_byte)
+                {
+                    Ok(AstNode::Class(base_byte, negated))
                 } else {
-                    Ok(AstNode::Literal(c as u8))
+                    Ok(AstNode::Literal(c))
                 }
             }
 
@@ -144,18 +167,15 @@ impl Parser {
             Token::RBracket => Err(Error::Parser(
                 "invalid pattern (unexpected ']')".to_string(),
             )),
-            Token::Star | Token::Plus | Token::Question | Token::Minus => {
-                Err(Error::Parser(format!(
-                    "invalid pattern (quantifier '{}' must follow an item)",
-                    token_to_char(&token)
-                )))
-            }
+            Token::Star | Token::Plus | Token::Question => Err(Error::Parser(format!(
+                "invalid pattern (quantifier '{}' must follow an item)",
+                token_to_byte(&token).unwrap_or(b'?')
+            ))),
+            Token::Minus => Ok(AstNode::Literal(b'-')),
             Token::Percent => Err(Error::Parser(
                 "internal error: Percent token should not reach parser base".to_string(),
             )),
-            Token::CaptureRef(_) => Err(Error::Parser(
-                "invalid pattern (capture reference %n not allowed here)".to_string(),
-            )),
+            Token::CaptureRef(n) => Ok(AstNode::CaptureRef(n as usize)),
         }
     }
 
@@ -185,7 +205,7 @@ impl Parser {
             match self.tokens.peek().cloned() {
                 Some(Token::Class(c)) => {
                     self.tokens.next();
-                    set.add_class(c.to_ascii_lowercase())?;
+                    set.add_class(c)?;
                 }
                 Some(Token::Literal(b)) => {
                     let current_byte = b;
@@ -270,46 +290,6 @@ impl Parser {
     }
 }
 
-fn token_to_char(token: &Token) -> char {
-    match token {
-        Token::Literal(b) => *b as char,
-        Token::Any => '.',
-        Token::LParen => '(',
-        Token::RParen => ')',
-        Token::LBracket => '[',
-        Token::RBracket => ']',
-        Token::Caret => '^',
-        Token::Dollar => '$',
-        Token::Star => '*',
-        Token::Plus => '+',
-        Token::Question => '?',
-        Token::Minus => '-',
-        Token::Percent => '%',
-        Token::Class(c) => *c,
-        Token::Balanced(_, _) => 'b',
-        Token::Frontier => 'f',
-        Token::CaptureRef(d) => std::char::from_digit(*d as u32, 10).unwrap_or('?'),
-    }
-}
-fn token_to_byte(token: &Token) -> Option<u8> {
-    match token {
-        Token::Literal(b) => Some(*b),
-        Token::Any => Some(b'.'),
-        Token::LParen => Some(b'('),
-        Token::RParen => Some(b')'),
-        Token::LBracket => Some(b'['),
-        Token::RBracket => Some(b']'),
-        Token::Caret => Some(b'^'),
-        Token::Dollar => Some(b'$'),
-        Token::Star => Some(b'*'),
-        Token::Plus => Some(b'+'),
-        Token::Question => Some(b'?'),
-        Token::Minus => Some(b'-'),
-        Token::Percent => Some(b'%'),
-        _ => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -339,7 +319,7 @@ mod tests {
         }
     }
 
-    fn make_set(bytes: &[u8], ranges: &[(u8, u8)], classes: &[char], negated: bool) -> CharSet {
+    fn make_set(bytes: &[u8], ranges: &[(u8, u8)], classes: &[u8], negated: bool) -> CharSet {
         let mut set = CharSet::new();
         for &b in bytes {
             set.add_byte(b);
@@ -374,7 +354,7 @@ mod tests {
             parse_ok("a%dc"),
             vec![
                 AstNode::Literal(b'a'),
-                AstNode::Class('d', false),
+                AstNode::Class(b'd', false),
                 AstNode::Literal(b'c')
             ]
         );
@@ -382,7 +362,7 @@ mod tests {
             parse_ok("a%Dc"),
             vec![
                 AstNode::Literal(b'a'),
-                AstNode::Class('d', true),
+                AstNode::Class(b'd', true),
                 AstNode::Literal(b'c')
             ]
         );
@@ -450,7 +430,7 @@ mod tests {
         );
         assert_eq!(
             parse_ok("%d+"),
-            vec![quantified(AstNode::Class('d', false), Quantifier::Plus)]
+            vec![quantified(AstNode::Class(b'd', false), Quantifier::Plus)]
         );
         assert_eq!(
             parse_ok(".*"),
@@ -482,7 +462,7 @@ mod tests {
         );
         assert_eq!(
             parse_ok("[a-c%d]"),
-            vec![AstNode::Set(make_set(&[], &[(b'a', b'c')], &['d'], false))]
+            vec![AstNode::Set(make_set(&[], &[(b'a', b'c')], &[b'd'], false))]
         );
         assert_eq!(
             parse_ok("[a.^$]"),
@@ -495,7 +475,7 @@ mod tests {
         );
         assert_eq!(
             parse_ok("[%a]"),
-            vec![AstNode::Set(make_set(&[], &[], &['a'], false))]
+            vec![AstNode::Set(make_set(&[], &[], &[b'a'], false))]
         );
         assert_eq!(
             parse_ok("[%]"),
@@ -554,7 +534,7 @@ mod tests {
                 index: 1,
                 inner: vec![
                     AstNode::Literal(b'a'),
-                    quantified(AstNode::Class('d', false), Quantifier::Plus)
+                    quantified(AstNode::Class(b'd', false), Quantifier::Plus)
                 ]
             }]
         );
@@ -609,7 +589,7 @@ mod tests {
         );
         assert_eq!(
             parse_ok("%d+"),
-            vec![quantified(AstNode::Class('d', false), Quantifier::Plus)]
+            vec![quantified(AstNode::Class(b'd', false), Quantifier::Plus)]
         );
         assert_eq!(
             parse_ok(".*"),
@@ -636,7 +616,7 @@ mod tests {
                     index: 1,
                     inner: vec![AstNode::Balanced(b'(', b')')]
                 },
-                quantified(AstNode::Class('d', false), Quantifier::Star),
+                quantified(AstNode::Class(b'd', false), Quantifier::Star),
                 AstNode::AnchorEnd
             ]
         );
@@ -680,7 +660,9 @@ mod tests {
             matches!(parse_err("%f[a"), Err(Error::Parser(s)) if s.contains("unfinished character class"))
         );
         assert!(matches!(parse_err("%z"), Err(Error::Lexer(_))));
-        assert!(matches!(parse_err("%1"), Err(Error::Parser(s)) if s.contains("not allowed here")));
+
+        assert_eq!(parse_ok("%1"), vec![AstNode::CaptureRef(1)]);
+
         let too_many_captures = "()".repeat(LUA_MAXCAPTURES + 1);
         assert!(
             matches!(parse_err(&too_many_captures), Err(Error::Parser(s)) if s.contains("too many captures"))
@@ -688,7 +670,7 @@ mod tests {
     }
 
     #[test]
-    fn test_special_character_edge_cases_parser() {
+    fn test_special_byte_edge_cases_parser() {
         assert_eq!(
             parse_ok("[%%]"),
             vec![AstNode::Set(make_set(&[b'%'], &[], &[], false))]
@@ -752,8 +734,8 @@ mod tests {
             vec![AstNode::Capture {
                 index: 1,
                 inner: vec![
-                    AstNode::Frontier(make_set(&[], &[], &['a'], false)),
-                    quantified(AstNode::Class('w', false), Quantifier::Plus)
+                    AstNode::Frontier(make_set(&[], &[], &[b'a'], false)),
+                    quantified(AstNode::Class(b'w', false), Quantifier::Plus)
                 ]
             }]
         );
@@ -781,7 +763,7 @@ mod tests {
         assert_eq!(
             parse_ok("%f[%w]word"),
             vec![
-                AstNode::Frontier(make_set(&[], &[], &['w'], false)),
+                AstNode::Frontier(make_set(&[], &[], &[b'w'], false)),
                 AstNode::Literal(b'w'),
                 AstNode::Literal(b'o'),
                 AstNode::Literal(b'r'),
@@ -792,8 +774,8 @@ mod tests {
         assert_eq!(
             parse_ok("%f[^%s]%w+"),
             vec![
-                AstNode::Frontier(make_set(&[], &[], &['s'], true)),
-                quantified(AstNode::Class('w', false), Quantifier::Plus)
+                AstNode::Frontier(make_set(&[], &[], &[b's'], true)),
+                quantified(AstNode::Class(b'w', false), Quantifier::Plus)
             ]
         );
     }

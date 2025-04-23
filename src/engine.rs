@@ -17,6 +17,7 @@ pub fn find_first_match(
     start_index: usize,
 ) -> Result<Option<(Range<usize>, Vec<Option<Range<usize>>>)>> {
     let input_len = input.len();
+
     if start_index > input_len {
         // Lua allows start > len for matching empty patterns at the end
         // Let the loop handle this. If start_index is way too large, it won't loop.
@@ -70,6 +71,7 @@ fn match_recursive(ast: &[AstNode], mut state: State) -> Option<State> {
             }
         }
         AstNode::Any => {
+            // In Lua 5.3 the "." token matches any single byte
             if state.current_byte().is_some() {
                 state.current_pos += 1;
                 match_recursive(remaining_ast, state)
@@ -127,6 +129,12 @@ fn match_recursive(ast: &[AstNode], mut state: State) -> Option<State> {
             None
         }
 
+        AstNode::CaptureRef(_) => {
+            // CaptureRef не имеет смысла в контексте сопоставления паттернов
+            // Это используется только в строке замены для gsub
+            None
+        }
+
         AstNode::Balanced(b1, b2) => {
             if state.current_byte() != Some(*b1) {
                 return None;
@@ -150,10 +158,10 @@ fn match_recursive(ast: &[AstNode], mut state: State) -> Option<State> {
         }
 
         AstNode::Frontier(charset) => {
-            let prev_char_in_set = state.previous_byte().is_some_and(|b| charset.contains(b));
-            let next_char_in_set = state.current_byte().is_some_and(|b |charset.contains(b));
+            let prev_byte_in_set = state.previous_byte().is_some_and(|b| charset.contains(b));
+            let next_byte_in_set = state.current_byte().is_some_and(|b| charset.contains(b));
 
-            if !prev_char_in_set && next_char_in_set {
+            if !prev_byte_in_set && next_byte_in_set {
                 match_recursive(remaining_ast, state)
             } else {
                 None
@@ -213,7 +221,8 @@ fn match_greedy_quantifier(
     }
     successful_match_states.push(current_state.clone());
 
-    while let Some(next_state) = match_recursive(std::slice::from_ref(item), current_state.clone()) {
+    while let Some(next_state) = match_recursive(std::slice::from_ref(item), current_state.clone())
+    {
         if next_state.current_pos == current_state.current_pos {
             successful_match_states.push(next_state.clone());
         }
@@ -263,7 +272,7 @@ fn match_non_greedy_quantifier(
 mod tests {
     use std::ops::Range;
 
-    use crate::{LUA_MAXCAPTURES, Parser, Result, find_first_match};
+    use crate::{LUA_MAXCAPTURES, Parser, Result, engine::find_first_match};
 
     fn find(
         pattern_str: &str,
@@ -609,7 +618,9 @@ mod tests {
     fn test_pattern_with_utf8_content_engine() {
         assert_match(".", "привет", 0..1, &[]);
         assert_match("..", "привет", 0..2, &[]);
+
         assert_match("[%w]+", "привет123", 12..15, &[]);
+
         assert_match("%a+", "hello привет", 0..5, &[]);
     }
 

@@ -1,17 +1,19 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::manual_is_ascii_check)]
+#![allow(unused)] // TODO: temporarily, to be removed after all functions have been implemented
 
 pub mod ast;
 pub mod charset;
 pub mod engine;
 pub mod lexer;
+pub mod lua;
 pub mod parser;
 
 pub use self::{
     ast::{AstNode, Quantifier},
     charset::CharSet,
-    engine::find_first_match,
     lexer::{Lexer, Token},
+    lua::{find, gmatch, gsub, Repl, r#match},
     parser::Parser,
 };
 
@@ -19,7 +21,7 @@ pub use self::{
 pub enum Error {
     Lexer(String),
     Parser(String),
-    Matcher(String),
+    Matcher(String), // TODO: Maybe remove Matcher variant if engine returns Option/Result
 }
 
 impl std::fmt::Display for Error {
@@ -32,4 +34,4 @@ impl std::fmt::Display for Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub const LUA_MAXCAPTURES: usize = 32; // TODO: remove it??
+pub const LUA_MAXCAPTURES: usize = 32;

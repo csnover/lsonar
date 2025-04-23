@@ -2,7 +2,7 @@
 pub enum Token {
     Literal(u8),      // Normal character byte
     Any,              // .
-    Class(char),      // %a, %d etc. (just the identifying char)
+    Class(u8),        // %a, %d etc. (just the identifying byte)
     LParen,           // (
     RParen,           // )
     LBracket,         // [

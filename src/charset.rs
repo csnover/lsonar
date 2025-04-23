@@ -38,53 +38,95 @@ impl CharSet {
         Ok(())
     }
 
-    pub fn add_class(&mut self, class_char: char) -> Result<()> {
-        match class_char {
-            'a' => ('a'..='z')
-                .chain('A'..='Z')
-                .for_each(|c| self.add_byte(c as u8)),
-            'c' => (0x00..=0x1f)
-                .chain(std::iter::once(0x7f))
-                .for_each(|b| self.add_byte(b)),
-            'd' => ('0'..='9').for_each(|c| self.add_byte(c as u8)),
-            'g' => (0x21..=0x7e).for_each(|b| self.add_byte(b)),
-            'l' => ('a'..='z').for_each(|c| self.add_byte(c as u8)),
-            'p' => (0x20..=0x7e).for_each(|b| {
-                if !((b'a'..=b'z').contains(&b)
-                    || (b'A'..=b'Z').contains(&b)
-                    || (b'0'..=b'9').contains(&b))
-                {
+    pub fn add_class(&mut self, class_byte: u8) -> Result<()> {
+        match class_byte {
+            b'a' => {
+                for b in b'a'..=b'z' {
                     self.add_byte(b);
                 }
-            }),
-            's' => [b' ', b'\t', b'\n', b'\r', 0x0b, 0x0c]
-                .iter()
-                .for_each(|&b| self.add_byte(b)),
-            'u' => ('A'..='Z').for_each(|c| self.add_byte(c as u8)),
-            'w' => ('a'..='z')
-                .chain('A'..='Z')
-                .chain('0'..='9')
-                .for_each(|c| self.add_byte(c as u8)),
-            'x' => ('0'..='9')
-                .chain('a'..='f')
-                .chain('A'..='F')
-                .for_each(|c| self.add_byte(c as u8)),
+                for b in b'A'..=b'Z' {
+                    self.add_byte(b);
+                }
+            }
+            b'c' => {
+                for b in 0x00..=0x1f {
+                    self.add_byte(b);
+                }
+                self.add_byte(0x7f);
+            }
+            b'd' => {
+                for b in b'0'..=b'9' {
+                    self.add_byte(b);
+                }
+            }
+            b'g' => {
+                for b in 0x21..=0x7e {
+                    self.add_byte(b);
+                }
+            }
+            b'l' => {
+                for b in b'a'..=b'z' {
+                    self.add_byte(b);
+                }
+            }
+            b'p' => {
+                for b in 0x20..=0x7e {
+                    if !((b'a'..=b'z').contains(&b)
+                        || (b'A'..=b'Z').contains(&b)
+                        || (b'0'..=b'9').contains(&b))
+                    {
+                        self.add_byte(b);
+                    }
+                }
+            }
+            b's' => {
+                for &b in &[b' ', b'\t', b'\n', b'\r', 0x0b, 0x0c] {
+                    self.add_byte(b);
+                }
+            }
+            b'u' => {
+                for b in b'A'..=b'Z' {
+                    self.add_byte(b);
+                }
+            }
+            b'w' => {
+                for b in b'a'..=b'z' {
+                    self.add_byte(b);
+                }
+                for b in b'A'..=b'Z' {
+                    self.add_byte(b);
+                }
+                for b in b'0'..=b'9' {
+                    self.add_byte(b);
+                }
+            }
+            b'x' => {
+                for b in b'0'..=b'9' {
+                    self.add_byte(b);
+                }
+                for b in b'a'..=b'f' {
+                    self.add_byte(b);
+                }
+                for b in b'A'..=b'F' {
+                    self.add_byte(b);
+                }
+            }
             _ => {
                 return Err(Error::Parser(format!(
-                    "invalid character class '%{}'",
-                    class_char
+                    "invalid byte class '%{:?}'",
+                    class_byte
                 )));
             }
         }
         Ok(())
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn contains(&self, b: u8) -> bool {
         self.bytes[b as usize]
     }
 
-    #[inline]
+    #[inline(always)]
     pub fn invert(&mut self) {
         for i in 0..256 {
             self.bytes[i] = !self.bytes[i];
@@ -135,7 +177,7 @@ mod tests {
     #[test]
     fn test_add_class_digit_charset() -> Result<()> {
         let mut set = CharSet::new();
-        set.add_class('d')?;
+        set.add_class(b'd')?;
         assert!(set.contains(b'0'));
         assert!(set.contains(b'5'));
         assert!(set.contains(b'9'));
@@ -147,7 +189,7 @@ mod tests {
     #[test]
     fn test_add_class_space_charset() -> Result<()> {
         let mut set = CharSet::new();
-        set.add_class('s')?;
+        set.add_class(b's')?;
         assert!(set.contains(b' '));
         assert!(set.contains(b'\t'));
         assert!(set.contains(b'\n'));
@@ -159,8 +201,8 @@ mod tests {
     #[test]
     fn test_add_class_invalid_charset() {
         let mut set = CharSet::new();
-        assert!(matches!(set.add_class('Z'), Err(Error::Parser(_))));
-        assert!(matches!(set.add_class('%'), Err(Error::Parser(_))));
+        assert!(matches!(set.add_class(b'Z'), Err(Error::Parser(_))));
+        assert!(matches!(set.add_class(b'%'), Err(Error::Parser(_))));
     }
 
     #[test]
