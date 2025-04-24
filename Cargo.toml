@@ -1,13 +1,12 @@
 [package]
 name = "lsonar"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 authors = ["reloginn <nikita.malina23@gmail.com>"]
 description = "Lua 5.3 pattern engine, fully compatible with the original Lua 5.3 engine"
 license = "MIT"
 
 [dependencies]
-cfg-if = "1.0.0"
 
 [features]
 default = ["1-based"]
