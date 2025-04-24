@@ -6,25 +6,26 @@ use super::{
 };
 use std::iter::Peekable;
 
-const fn token_to_byte(token: &Token) -> Option<u8> {
+const fn token_to_byte(token: &Token) -> u8 {
     match token {
-        Token::Literal(b) => Some(*b),
-        Token::Any => Some(b'.'),
-        Token::LParen => Some(b'('),
-        Token::RParen => Some(b')'),
-        Token::LBracket => Some(b'['),
-        Token::RBracket => Some(b']'),
-        Token::Caret => Some(b'^'),
-        Token::Dollar => Some(b'$'),
-        Token::Star => Some(b'*'),
-        Token::Plus => Some(b'+'),
-        Token::Question => Some(b'?'),
-        Token::Minus => Some(b'-'),
-        Token::Percent => Some(b'%'),
-        Token::Class(c) => Some(*c),
-        Token::Balanced(_, _) => Some(b'b'),
-        Token::Frontier => Some(b'f'),
-        Token::CaptureRef(d) => Some(b'0' + *d),
+        Token::Literal(b) => *b,
+        Token::EscapedLiteral(b) => *b,
+        Token::Any => b'.',
+        Token::LParen => b'(',
+        Token::RParen => b')',
+        Token::LBracket => b'[',
+        Token::RBracket => b']',
+        Token::Caret => b'^',
+        Token::Dollar => b'$',
+        Token::Star => b'*',
+        Token::Plus => b'+',
+        Token::Question => b'?',
+        Token::Minus => b'-',
+        Token::Percent => b'%',
+        Token::Class(c) => *c,
+        Token::Balanced(_, _) => b'b',
+        Token::Frontier => b'f',
+        Token::CaptureRef(d) => b'0' + *d,
     }
 }
 
@@ -125,7 +126,14 @@ impl Parser {
         };
 
         match token {
+            Token::Literal(b')') => Err(Error::Parser(
+                "malformed pattern (unexpected ')')".to_string(),
+            )),
+            Token::Literal(b']') => Err(Error::Parser(
+                "malformed pattern (unexpected ']')".to_string(),
+            )),
             Token::Literal(b) => Ok(AstNode::Literal(b)),
+            Token::EscapedLiteral(b) => Ok(AstNode::Literal(b)),
             Token::Any => Ok(AstNode::Any),
             Token::Caret => Ok(AstNode::AnchorStart),
             Token::Dollar => Ok(AstNode::AnchorEnd),
@@ -169,7 +177,7 @@ impl Parser {
             )),
             Token::Star | Token::Plus | Token::Question => Err(Error::Parser(format!(
                 "invalid pattern (quantifier '{}' must follow an item)",
-                token_to_byte(&token).unwrap_or(b'?')
+                token_to_byte(&token)
             ))),
             Token::Minus => Ok(AstNode::Literal(b'-')),
             Token::Percent => Err(Error::Parser(
@@ -211,7 +219,7 @@ impl Parser {
                     let current_byte = b;
                     self.tokens.next();
 
-                    if self.tokens.peek() == Some(&Token::Minus) {
+                    if self.tokens.peek() == Some(&Token::Literal(b'-')) {
                         let mut iter_clone = self.tokens.clone();
                         iter_clone.next();
 
@@ -236,15 +244,9 @@ impl Parser {
                     set.add_byte(b'%');
                 }
                 Some(_) => {
-                    let token = self.tokens.next().unwrap();
-                    if let Some(byte) = token_to_byte(&token) {
-                        set.add_byte(byte);
-                    } else {
-                        return Err(Error::Parser(format!(
-                            "invalid token {:?} inside character set",
-                            token
-                        )));
-                    }
+                    let token = self.tokens.next().unwrap(); // TODO: remove `unwrap`
+                    let byte = token_to_byte(&token);
+                    set.add_byte(byte)
                 }
                 None => unreachable!(),
             }

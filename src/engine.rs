@@ -49,55 +49,24 @@ pub fn find_first_match(
 }
 
 fn match_recursive(ast: &[AstNode], mut state: State) -> Option<State> {
-    println!(
-        "[{: >2}] match: pos={}, ast_len={}",
-        state.recursion_depth,
-        state.current_pos,
-        ast.len()
-    );
     if state.recursion_depth > MAX_RECURSION_DEPTH {
-        println!(
-            "[{: >2}] -> Max recursion depth exceeded, returning None",
-            state.recursion_depth
-        );
         return None;
     }
     state.recursion_depth += 1;
 
     if ast.is_empty() {
-        println!(
-            "[{: >2}] -> AST empty, returning Some(pos={})",
-            state.recursion_depth - 1,
-            state.current_pos
-        );
         return Some(state);
     }
 
     let node = ast.first().unwrap();
     let remaining_ast = ast.get(1..).unwrap_or(&[]);
-    println!(
-        "[{: >2}]   Node: {:?}, Current char: {:?}",
-        state.recursion_depth - 1,
-        node,
-        state.current_byte().map(|b| b as char)
-    );
 
     let result = match node {
         AstNode::Literal(b) => {
-            println!(
-                "[{: >2}]   Matching Literal: {}",
-                state.recursion_depth - 1,
-                *b as char
-            );
             if state.current_byte() == Some(*b) {
                 state.current_pos += 1;
-                println!(
-                    "[{: >2}]     Literal matched, recursing for remaining...",
-                    state.recursion_depth - 1
-                );
                 match_recursive(remaining_ast, state)
             } else {
-                println!("[{: >2}]     Literal mismatch.", state.recursion_depth - 1);
                 None
             }
         }
@@ -110,21 +79,10 @@ fn match_recursive(ast: &[AstNode], mut state: State) -> Option<State> {
             }
         }
         AstNode::Class(c, negated) => {
-            println!(
-                "[{: >2}]   Matching Class: {} (negated={})",
-                state.recursion_depth - 1,
-                *c as char,
-                *negated
-            );
             if state.check_class(*c, *negated) {
                 state.current_pos += 1;
-                println!(
-                    "[{: >2}]     Class matched, recursing for remaining...",
-                    state.recursion_depth - 1
-                );
                 match_recursive(remaining_ast, state)
             } else {
-                println!("[{: >2}]     Class mismatch.", state.recursion_depth - 1);
                 None
             }
         }
@@ -155,57 +113,17 @@ fn match_recursive(ast: &[AstNode], mut state: State) -> Option<State> {
             }
         }
         AstNode::Capture { index, inner } => {
-            println!(
-                "[{: >2}]   Entering Capture #{} (start_pos={})",
-                state.recursion_depth - 1,
-                index,
-                state.current_pos
-            );
             let start_pos = state.current_pos;
             let capture_index = *index - 1; // 0-based for [`Vec`] index
 
-            println!(
-                "[{: >2}]     Recursing for inner capture content...",
-                state.recursion_depth - 1
-            );
             if let Some(mut success_state) = match_recursive(inner, state.clone()) {
                 let capture_range = start_pos..success_state.current_pos;
-                println!(
-                    "[{: >2}]     Inner capture match SUCCESS, range={:?}, new_pos={}",
-                    state.recursion_depth - 1,
-                    capture_range,
-                    success_state.current_pos
-                );
                 success_state.captures[capture_index] = Some(capture_range.clone());
 
-                println!(
-                    "[{: >2}]     Recursing for remaining pattern after capture...",
-                    state.recursion_depth - 1
-                );
                 if let Some(final_state) = match_recursive(remaining_ast, success_state) {
-                    println!(
-                        "[{: >2}]   Capture #{} returning Some(final_state)",
-                        state.recursion_depth - 1,
-                        index
-                    );
                     return Some(final_state);
-                } else {
-                    println!(
-                        "[{: >2}]     Remaining pattern after capture FAILED.",
-                        state.recursion_depth - 1
-                    );
                 }
-            } else {
-                println!(
-                    "[{: >2}]     Inner capture match FAILED.",
-                    state.recursion_depth - 1
-                );
             }
-            println!(
-                "[{: >2}]   Capture #{} returning None",
-                state.recursion_depth - 1,
-                index
-            );
             None
         }
 

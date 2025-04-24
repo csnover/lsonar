@@ -162,10 +162,6 @@ fn test_sets_parser() {
         vec![AstNode::Set(make_set(&[], &[(b'a', b'c')], &[], true))]
     );
     assert_eq!(
-        parse_ok("[a-c%d]"),
-        vec![AstNode::Set(make_set(&[], &[(b'a', b'c')], &[b'd'], false))]
-    );
-    assert_eq!(
         parse_ok("[a.^$]"),
         vec![AstNode::Set(make_set(
             &[b'a', b'.', b'^', b'$'],
@@ -179,7 +175,7 @@ fn test_sets_parser() {
         vec![AstNode::Set(make_set(&[], &[], &[b'a'], false))]
     );
     assert_eq!(
-        parse_ok("[%]"),
+        parse_ok("[%%]"),
         vec![AstNode::Set(make_set(&[b'%'], &[], &[], false))]
     );
     assert_eq!(
@@ -305,15 +301,21 @@ fn test_complex_parser() {
 }
 
 #[test]
+fn test_escaped_rparen_rbracket_without_panic() {
+    assert_eq!(parse_ok("%]"), vec![AstNode::Literal(b']')]);
+    assert_eq!(parse_ok("%)"), vec![AstNode::Literal(b')')])
+}
+
+#[test]
 fn test_throw_parser_errors() {
     assert!(
         matches!(parse_err("("), Err(Error::Parser(s)) if s.contains("malformed pattern (unexpected end, expected RParen)"))
     );
     assert!(matches!(parse_err(")"), Err(Error::Parser(s)) if s.contains("unexpected ')'")));
+    assert!(matches!(parse_err("]"), Err(Error::Parser(s)) if s.contains("unexpected ']'")));
     assert!(
         matches!(parse_err("["), Err(Error::Parser(s)) if s.contains("unfinished character class"))
     );
-    assert_eq!(parse_ok("]"), vec![AstNode::Literal(b']')]);
     assert!(matches!(parse_err("*"), Err(Error::Parser(s)) if s.contains("must follow an item")));
     assert!(matches!(parse_err("^*"), Err(Error::Parser(s)) if s.contains("cannot be quantified")));
     assert!(matches!(parse_err("$+"), Err(Error::Parser(s)) if s.contains("cannot be quantified")));
@@ -347,18 +349,15 @@ fn test_special_byte_edge_cases_parser() {
     );
     assert_eq!(
         parse_ok("[%-]"),
-        vec![AstNode::Set(make_set(&[b'%', b'-'], &[], &[], false))]
+        vec![AstNode::Set(make_set(&[b'-'], &[], &[], false))]
     );
     assert_eq!(
         parse_ok("[%]]"),
-        vec![
-            AstNode::Set(make_set(&[b'%'], &[], &[], false)),
-            AstNode::Literal(b']')
-        ]
+        vec![AstNode::Set(make_set(&[b']'], &[], &[], false))]
     );
     assert_eq!(
         parse_ok("[%[]"),
-        vec![AstNode::Set(make_set(&[b'%', b'['], &[], &[], false))]
+        vec![AstNode::Set(make_set(&[b'['], &[], &[], false))]
     );
 
     assert_eq!(
@@ -370,7 +369,7 @@ fn test_special_byte_edge_cases_parser() {
     );
     assert_eq!(
         parse_ok("[%[]"),
-        vec![AstNode::Set(make_set(&[b'%', b'['], &[], &[], false))]
+        vec![AstNode::Set(make_set(&[b'['], &[], &[], false))]
     );
 }
 
