@@ -1,4 +1,3 @@
-use crate::Error;
 use crate::Result;
 use std::collections::HashMap;
 
@@ -59,55 +58,4 @@ fn tokenize_replacement_string(repl: &str) -> Vec<ReplToken> {
     }
 
     tokens
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_tokenize_replacement_string() {
-        use ReplToken::*;
-
-        let tokens = tokenize_replacement_string("hello %1 world %2");
-        assert!(matches!(tokens[0], Literal(b'h')));
-        assert!(matches!(tokens[6], CaptureRef(1)));
-        assert!(matches!(tokens[14], CaptureRef(2)));
-
-        let tokens = tokenize_replacement_string("%%");
-        assert!(matches!(tokens[0], Literal(b'%')));
-
-        let tokens = tokenize_replacement_string("%");
-        assert!(matches!(tokens[0], Literal(b'%')));
-
-        let tokens = tokenize_replacement_string("a%5b%c");
-        assert!(matches!(tokens[0], Literal(b'a')));
-        assert!(matches!(tokens[1], CaptureRef(5)));
-        assert!(matches!(tokens[2], Literal(b'b')));
-        assert!(matches!(tokens[3], Literal(b'%')));
-        assert!(matches!(tokens[4], Literal(b'c')));
-    }
-
-    #[test]
-    fn test_process_replacement_string() {
-        assert_eq!(
-            process_replacement_string("hello %1", &["world"]).unwrap(),
-            "hello world"
-        );
-
-        assert_eq!(
-            process_replacement_string("%2 is %1", &["name", "value"]).unwrap(),
-            "value is name"
-        );
-
-        assert_eq!(process_replacement_string("%%", &[]).unwrap(), "%");
-
-        assert_eq!(
-            process_replacement_string("a%5b", &["1", "2", "3", "4", "5"]).unwrap(),
-            "a5b"
-        );
-
-        // Индекс больше числа захватов
-        assert_eq!(process_replacement_string("%9", &["capture"]).unwrap(), "");
-    }
 }

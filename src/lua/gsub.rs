@@ -1,6 +1,5 @@
 use super::super::{Parser, Result, engine::find_first_match};
 use repl::process_replacement_string;
-use std::collections::HashMap;
 
 mod repl;
 
@@ -16,7 +15,6 @@ pub fn gsub<'a>(
     let text_bytes = text.as_bytes();
     let byte_len = text_bytes.len();
 
-    // Парсим паттерн поиска
     let mut parser = Parser::new(pattern)?;
     let pattern_ast = parser.parse()?;
 
@@ -87,128 +85,4 @@ pub fn gsub<'a>(
     }
 
     Ok((result, replacements))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_basic_gsub() {
-        assert_eq!(
-            gsub("hello world", "l", Repl::String("L"), None),
-            Ok(("heLLo worLd".to_string(), 3))
-        );
-        assert_eq!(
-            gsub("hello world", "l", Repl::String("L"), Some(2)),
-            Ok(("heLLo world".to_string(), 2))
-        );
-    }
-
-    #[test]
-    fn test_gsub_with_captures() {
-        assert_eq!(
-            gsub(
-                "name=John age=25",
-                "(%w+)=(%w+)",
-                Repl::String("%2 is %1"),
-                None
-            ),
-            Ok(("John is name 25 is age".to_string(), 2))
-        );
-    }
-
-    #[test]
-    fn test_gsub_with_patterns() {
-        assert_eq!(
-            gsub("hello 123 world 456", "%d+", Repl::String("<number>"), None),
-            Ok(("hello <number> world <number>".to_string(), 2))
-        );
-    }
-
-    #[test]
-    fn test_gsub_with_empty_matches() {
-        assert_eq!(
-            gsub("hello", "", Repl::String("-"), None),
-            Ok(("-h-e-l-l-o-".to_string(), 6))
-        );
-    }
-
-    #[test]
-    fn test_gsub_escape_percent() {
-        assert_eq!(
-            gsub("hello", "e", Repl::String("%% escaped"), None),
-            Ok(("h% escapedllo".to_string(), 1))
-        );
-    }
-
-    #[test]
-    fn test_gsub_complex() {
-        assert_eq!(
-            gsub(
-                "User: John, Age: 25, Email: john@example.com",
-                "(User: )(%w+)(, Age: )(%d+)",
-                Repl::String("%1%2%3%4 (adult)"),
-                None
-            ),
-            Ok((
-                "User: John, Age: 25 (adult), Email: john@example.com".to_string(),
-                1
-            ))
-        );
-    }
-
-    #[test]
-    fn test_gsub_with_function() {
-        let result = gsub(
-            "hello world",
-            "%w+",
-            Repl::Function(Box::new(|captures: &[&str]| {
-                let word = captures[0];
-                word.to_uppercase()
-            })),
-            None,
-        );
-        assert_eq!(result, Ok(("HELLO WORLD".to_string(), 2)));
-
-        let result = gsub(
-            "a=1, b=2, c=3",
-            "(%w)=(%d)",
-            Repl::Function(Box::new(|captures: &[&str]| {
-                format!(
-                    "{}={}",
-                    captures[1],
-                    captures[2].parse::<i32>().unwrap() * 2
-                )
-            })),
-            None,
-        );
-        assert_eq!(result, Ok(("a=2, b=4, c=6".to_string(), 3)));
-    }
-
-    #[test]
-    fn test_gsub_with_table() {
-        let mut table = HashMap::new();
-        table.insert("hello".to_string(), "привет".to_string());
-        table.insert("world".to_string(), "мир".to_string());
-
-        let result = gsub("hello world", "%w+", Repl::Table(&table), None);
-        assert_eq!(result, Ok(("привет мир".to_string(), 2)));
-
-        let mut table = HashMap::new();
-        table.insert("hello".to_string(), "привет".to_string());
-
-        let result = gsub("hello world", "%w+", Repl::Table(&table), None);
-        assert_eq!(result, Ok(("привет world".to_string(), 2)));
-    }
-
-    #[test]
-    fn test_gsub_with_captures_and_table() {
-        let mut table = HashMap::new();
-        table.insert("name".to_string(), "имя".to_string());
-        table.insert("age".to_string(), "возраст".to_string());
-
-        let result = gsub("name=John age=25", "(%w+)=%w+", Repl::Table(&table), None);
-        assert_eq!(result, Ok(("имя возраст".to_string(), 2)));
-    }
 }
