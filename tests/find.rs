@@ -120,11 +120,10 @@ fn test_find_pattern_with_captures() {
         find("name=John age=25", "(%w+)=(%w+)", None, false),
         Ok(Some((1, 9, svec(&["name", "John"]))))
     );
-    // FIXME: this is bug, see `Known Issues`
-    /* assert_eq!(
-        find("2023-04-15", "(%d%d%d%d)-(%d%d)-(%d%d)", None, false),
+    assert_eq!(
+        find("2023-04-15", "(%d%d%d%d)%-(%d%d)%-(%d%d)", None, false),
         Ok(Some((1, 10, svec(&["2023", "04", "15"]))))
-    ); */
+    );
 }
 
 #[test]

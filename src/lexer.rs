@@ -39,7 +39,8 @@ fn is_escapable_magic_byte(c: u8) -> bool {
 pub struct Lexer<'a> {
     input: &'a [u8],
     pos: usize,
-    in_set: bool,
+    capture_depth: usize,
+    set_depth: usize,
 }
 
 impl<'a> Lexer<'a> {
@@ -47,7 +48,8 @@ impl<'a> Lexer<'a> {
         Lexer {
             input: input.as_bytes(),
             pos: 0,
-            in_set: false,
+            capture_depth: 0,
+            set_depth: 0,
         }
     }
 
@@ -69,16 +71,26 @@ impl<'a> Lexer<'a> {
         };
 
         match byte {
-            b'(' => Ok(Some(Token::LParen)),
-            b')' => Ok(Some(Token::RParen)),
+            b'(' => {
+                self.capture_depth += 1;
+                Ok(Some(Token::LParen))
+            }
+            b')' => {
+                if self.capture_depth > 0 {
+                    self.capture_depth -= 1;
+                    Ok(Some(Token::RParen))
+                } else {
+                    Ok(Some(Token::Literal(b')')))
+                }
+            }
             b'.' => Ok(Some(Token::Any)),
             b'[' => {
-                self.in_set = true;
+                self.set_depth += 1;
                 Ok(Some(Token::LBracket))
             }
             b']' => {
-                if self.in_set {
-                    self.in_set = false;
+                if self.set_depth > 0 {
+                    self.set_depth -= 1;
                     Ok(Some(Token::RBracket))
                 } else {
                     Ok(Some(Token::Literal(byte)))
@@ -86,18 +98,51 @@ impl<'a> Lexer<'a> {
             }
             b'^' => Ok(Some(Token::Caret)),
             b'$' => Ok(Some(Token::Dollar)),
-            b'*' => Ok(Some(Token::Star)),
-            b'+' => Ok(Some(Token::Plus)),
-            b'?' => Ok(Some(Token::Question)),
-            b'-' => Ok(Some(Token::Minus)),
+            b'*' => {
+                if self.set_depth > 0 {
+                    Ok(Some(Token::Literal(b'*')))
+                } else {
+                    Ok(Some(Token::Star))
+                }
+            }
+            b'+' => {
+                if self.set_depth > 0 {
+                    Ok(Some(Token::Literal(b'+')))
+                } else {
+                    Ok(Some(Token::Plus))
+                }
+            }
+            b'?' => {
+                if self.set_depth > 0 {
+                    Ok(Some(Token::Literal(b'?')))
+                } else {
+                    Ok(Some(Token::Question))
+                }
+            }
+            b'-' => {
+                if self.set_depth > 0 {
+                    Ok(Some(Token::Literal(b'-')))
+                } else {
+                    Ok(Some(Token::Minus))
+                }
+            }
             b'%' => {
-                if self.in_set {
-                    if let Some(next_byte_peek) = self.peek() {
-                        if is_class_byte(next_byte_peek) {
-                            self.advance();
-                            Ok(Some(Token::Class(next_byte_peek)))
-                        } else {
-                            Ok(Some(Token::Literal(b'%')))
+                if self.set_depth > 0 {
+                    if let Some(next_byte) = self.peek() {
+                        match next_byte {
+                            byte if is_class_byte(next_byte) => Ok(Some(Token::Class(byte))),
+                            byte if is_escapable_magic_byte(next_byte) => {
+                                self.advance();
+                                Ok(Some(Token::EscapedLiteral(byte)))
+                            }
+                            b'%' => {
+                                self.advance();
+                                Ok(Some(Token::EscapedLiteral(b'%')))
+                            }
+                            _ => Err(Error::Lexer(format!(
+                                "malformed pattern (invalid escape sequence in set: %{})",
+                                next_byte
+                            ))),
                         }
                     } else {
                         Err(Error::Lexer(
@@ -111,8 +156,12 @@ impl<'a> Lexer<'a> {
                         ));
                     };
                     match next_byte {
-                        c if is_escapable_magic_byte(c) => Ok(Some(Token::Literal(c))),
+                        c if is_escapable_magic_byte(c) => Ok(Some(Token::EscapedLiteral(c))),
                         c if is_class_byte(c) => Ok(Some(Token::Class(c))),
+                        b'%' => {
+                            self.advance();
+                            Ok(Some(Token::EscapedLiteral(b'%')))
+                        }
                         b'b' => {
                             let Some(d1) = self.advance() else {
                                 return Err(Error::Lexer(
@@ -129,7 +178,7 @@ impl<'a> Lexer<'a> {
                         b'f' => Ok(Some(Token::Frontier)),
                         d @ b'1'..=b'9' => Ok(Some(Token::CaptureRef(d - b'0'))),
                         _ => Err(Error::Lexer(format!(
-                            "malformed pattern (invalid use of '%%' in pattern: %{:?})",
+                            "malformed pattern (invalid escape sequence in set: %{})",
                             next_byte
                         ))),
                     }
