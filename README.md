@@ -8,4 +8,4 @@ If you find any bug, please create an `Issue`. If you have already solved it, cr
 - **Fix:** Errors should be enum variants, not [`String`]
 
 # Known Issues
-- In the test [test_find_pattern_with_captures], we are only capturing two %ds in the first capture (20), although we should capture the whole string.
+- In the test [`test_find_pattern_with_captures`], we are only capturing two `%d`s in the first capture (`20`), although we should capture the whole string.
