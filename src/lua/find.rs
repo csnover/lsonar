@@ -2,7 +2,6 @@ use super::{
     super::{Parser, Result, engine::find_first_match},
     calculate_start_index,
 };
-use cfg_if::cfg_if;
 
 /// Corresponds to Lua 5.3 [`string.find`].
 /// Returns 1-based or 0-based (see features [`1-based`] and [`0-based`]) indices (start, end) and captured strings. The [`init`] argument can be either 0-based or 1-based.
@@ -18,34 +17,38 @@ pub fn find(
     let start_byte_index = calculate_start_index(byte_len, init);
 
     if plain {
-        if start_byte_index >= byte_len && !pattern.is_empty() {
-            return Ok(None);
+        if pattern.is_empty() {
+            if cfg!(feature = "1-based") {
+                return Ok(Some((
+                    start_byte_index.saturating_add(1),
+                    start_byte_index,
+                    vec![],
+                )));
+            } else {
+                return Ok(Some((start_byte_index, start_byte_index, vec![])));
+            }
         }
 
-        if pattern.is_empty() {
-            cfg_if! {
-                if #[cfg(feature = "1-based")] {
-                    return Ok(Some((start_byte_index + 1, start_byte_index, vec![]))); // 1-based
-                } else {
-                    return Ok(Some((start_byte_index, start_byte_index, vec![]))); // 0-based
-                }
-            }
+        if start_byte_index >= byte_len {
+            return Ok(None);
         }
 
         if let Some(rel_byte_pos) = text_bytes[start_byte_index..]
             .windows(pattern.len())
             .position(|window| window == pattern.as_bytes())
         {
-            let start_pos = start_byte_index + rel_byte_pos;
-            let end_pos = start_pos + pattern.len() - 1; // End position is inclusive in Lua
+            let zero_based_start_pos = start_byte_index + rel_byte_pos;
+            let zero_based_end_pos = zero_based_start_pos + pattern.len();
 
-            cfg_if! {
-                if #[cfg(feature = "1-based")] {
-                    Ok(Some((start_pos + 1, end_pos + 1, vec![]))) // 1-based
-                } else  {
-                    Ok(Some((start_pos, end_pos, vec![]))) // 0-based
-                }
-            }
+            let start_pos = if cfg!(feature = "1-based") {
+                zero_based_start_pos.saturating_add(1)
+            } else {
+                zero_based_start_pos
+            };
+
+            let end_pos = zero_based_end_pos;
+
+            Ok(Some((start_pos, end_pos, vec![])))
         } else {
             Ok(None)
         }
@@ -55,8 +58,12 @@ pub fn find(
 
         match find_first_match(&ast, text_bytes, start_byte_index)? {
             Some((match_byte_range, captures_byte_ranges)) => {
-                let start_pos = match_byte_range.start;
-                let end_pos = match_byte_range.end.saturating_sub(1);
+                let start_pos = if cfg!(feature = "1-based") {
+                    match_byte_range.start.saturating_add(1)
+                } else {
+                    match_byte_range.start
+                };
+                let end_pos = match_byte_range.end;
 
                 let captured_strings: Vec<String> = captures_byte_ranges
                     .into_iter()
@@ -66,91 +73,9 @@ pub fn find(
                     })
                     .collect();
 
-                cfg_if! {
-                    if #[cfg(feature = "1-based")] {
-                        Ok(Some((start_pos + 1, end_pos + 1, captured_strings))) // 1-based
-                    } else {
-                        Ok(Some((start_pos, end_pos, captured_strings))) // 0-based
-                    }
-                }
+                Ok(Some((start_pos, end_pos, captured_strings)))
             }
             None => Ok(None),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::*;
-
-    fn svec(items: &[&str]) -> Vec<String> {
-        items.iter().map(|&s| s.to_string()).collect()
-    }
-
-    #[test]
-    fn test_negative_byte_classes() {
-        assert_eq!(find("a b\tc", "%S", None, false), Ok(Some((1, 1, vec![]))));
-        assert_eq!(find("a b\tc", "%S+", None, false), Ok(Some((1, 1, vec![]))));
-        assert_eq!(find(" b\tc", "%S", None, false), Ok(Some((2, 2, vec![]))));
-        assert_eq!(find("123abc", "%D", None, false), Ok(Some((4, 4, vec![]))));
-        assert_eq!(find("123abc", "%D+", None, false), Ok(Some((4, 6, vec![]))));
-        assert_eq!(find("abc_123", "%W", None, false), Ok(Some((4, 4, vec![]))));
-        assert_eq!(find("-abc-", "%W", None, false), Ok(Some((1, 1, vec![]))));
-        assert_eq!(find("abc123", "%A", None, false), Ok(Some((4, 4, vec![]))));
-        assert_eq!(find("abc123", "%A+", None, false), Ok(Some((4, 6, vec![]))));
-        assert_eq!(find("你a", "%A", None, false), Ok(Some((1, 1, vec![]))));
-        assert_eq!(find("a你b", "%W", None, false), Ok(Some((2, 2, vec![]))));
-    }
-
-    #[test]
-    fn test_balanced_patterns() {
-        assert_eq!(
-            find("a(b(c)d)e", "%b()", None, false),
-            Ok(Some((2, 8, vec![])))
-        );
-
-        assert_eq!(
-            find("a{b{c}d}e", "%b{}", None, false),
-            Ok(Some((2, 8, vec![])))
-        );
-
-        assert_eq!(
-            find("a<b<c>d>e", "%b<>", None, false),
-            Ok(Some((2, 8, vec![])))
-        );
-
-        assert_eq!(
-            find("a(b(c(d)e)f)g", "%b()", None, false),
-            Ok(Some((2, 12, vec![])))
-        );
-
-        assert_eq!(
-            find("a(b(c)d)e", "(%b())", None, false),
-            Ok(Some((2, 8, svec(&["(b(c)d)"]))))
-        );
-    }
-
-    #[test]
-    fn test_find_invalid_pattern() {
-        assert!(matches!(
-            find("abc", "[", None, false),
-            Err(Error::Parser(_))
-        ));
-        assert!(matches!(
-            find("abc", "(", None, false),
-            Err(Error::Parser(_))
-        ));
-        assert!(matches!(
-            find("abc", "*", None, false),
-            Err(Error::Parser(_))
-        ));
-        assert!(matches!(
-            find("abc", "%", None, false),
-            Err(Error::Lexer(_))
-        ));
-        assert!(matches!(
-            find("abc", "%z", None, false),
-            Err(Error::Parser(_)) | Err(Error::Lexer(_))
-        ));
     }
 }

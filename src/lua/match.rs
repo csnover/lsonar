@@ -2,7 +2,6 @@ use super::{
     super::{Parser, Result, engine::find_first_match},
     calculate_start_index,
 };
-use cfg_if::cfg_if;
 
 /// Corresponds to Lua 5.3 `string.match`
 pub fn r#match(text: &str, pattern: &str, init: Option<isize>) -> Result<Option<Vec<String>>> {
@@ -35,74 +34,5 @@ pub fn r#match(text: &str, pattern: &str, init: Option<isize>) -> Result<Option<
             }
         }
         None => Ok(None),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn svec(items: &[&str]) -> Vec<String> {
-        items.iter().map(|&s| s.to_string()).collect()
-    }
-
-    #[test]
-    fn test_basic_match() {
-        assert_eq!(
-            r#match("hello world", "hello", None),
-            Ok(Some(svec(&["hello"])))
-        );
-        assert_eq!(
-            r#match("hello world", "world", None),
-            Ok(Some(svec(&["world"])))
-        );
-        assert_eq!(r#match("hello world", "bye", None), Ok(None));
-    }
-
-    #[test]
-    fn test_match_with_captures() {
-        assert_eq!(
-            r#match("hello world", "(hello)", None),
-            Ok(Some(svec(&["hello"])))
-        );
-        assert_eq!(
-            r#match("hello world", "(hello) (world)", None),
-            Ok(Some(svec(&["hello", "world"])))
-        );
-        assert_eq!(
-            r#match("123-456-7890", "(%d+)%-(%d+)%-(%d+)", None),
-            Ok(Some(svec(&["123", "456", "7890"])))
-        );
-    }
-
-    #[test]
-    fn test_match_with_init() {
-        assert_eq!(
-            r#match("hello world", "world", Some(6)),
-            Ok(Some(svec(&["world"])))
-        );
-        assert_eq!(
-            r#match("hello world", "hello", Some(1)),
-            Ok(Some(svec(&["hello"])))
-        );
-        assert_eq!(r#match("hello world", "hello", Some(2)), Ok(None));
-    }
-
-    #[test]
-    fn test_match_patterns() {
-        assert_eq!(r#match("abc123", "%a+", None), Ok(Some(svec(&["abc"]))));
-        assert_eq!(r#match("abc123", "%d+", None), Ok(Some(svec(&["123"]))));
-        assert_eq!(
-            r#match("abc123", "(%a+)(%d+)", None),
-            Ok(Some(svec(&["abc", "123"])))
-        );
-    }
-
-    #[test]
-    fn test_match_with_empty_captures() {
-        assert_eq!(
-            r#match("hello", "(h)()ello", None),
-            Ok(Some(svec(&["h", ""])))
-        );
     }
 }

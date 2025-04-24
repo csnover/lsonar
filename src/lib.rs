@@ -1,6 +1,5 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::manual_is_ascii_check)]
-#![allow(unused)] // TODO: temporarily, to be removed after all functions have been implemented
 
 pub mod ast;
 pub mod charset;
@@ -13,7 +12,7 @@ pub use self::{
     ast::{AstNode, Quantifier},
     charset::CharSet,
     lexer::{Lexer, Token},
-    lua::{find, gmatch, gsub, Repl, r#match},
+    lua::{Repl, find, gmatch, gsub, r#match},
     parser::Parser,
 };
 

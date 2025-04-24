@@ -10,8 +10,6 @@ pub use self::{
     r#match::r#match,
 };
 
-use cfg_if::cfg_if;
-
 fn calculate_start_index(text_len: usize, init: Option<isize>) -> usize {
     match init {
         Some(i) if i > 0 => {
