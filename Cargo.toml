@@ -1,6 +1,6 @@
 [package]
 name = "lsonar"
-version = "0.2.1"
+version = "0.2.3"
 edition = "2024"
 authors = ["reloginn <nikita.malina23@gmail.com>"]
 description = "Lua 5.3 pattern engine, fully compatible with the original Lua 5.3 engine"

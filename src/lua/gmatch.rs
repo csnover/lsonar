@@ -5,10 +5,10 @@ mod iter;
 pub use iter::GMatchIterator;
 
 /// Corresponds to Lua 5.3 `string.gmatch`
-pub fn gmatch<'a>(
-    text: &'a str,
+pub fn gmatch(
+    text: &str,
     pattern: &str,
-) -> Result<impl Iterator<Item = Result<Vec<String>>> + 'a> {
+) -> Result<GMatchIterator> {
     let is_empty_pattern = pattern.is_empty();
 
     let pattern_ast = if is_empty_pattern {
@@ -19,7 +19,7 @@ pub fn gmatch<'a>(
     };
 
     Ok(GMatchIterator {
-        text: text.as_bytes(),
+        bytes: text.as_bytes().to_vec(),
         pattern_ast,
         current_pos: 0,
         is_empty_pattern,
