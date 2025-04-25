@@ -19,7 +19,7 @@ pub fn gmatch<'a>(
     };
 
     Ok(GMatchIterator {
-        text: text.as_bytes(),
+        bytes: text.as_bytes().to_vec(),
         pattern_ast,
         current_pos: 0,
         is_empty_pattern,
