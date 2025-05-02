@@ -6,6 +6,3 @@ If you find any bug, please create an `Issue`. If you have already solved it, cr
 
 # TODO
 - **Refactor:** Errors should be enum variants, not [`String`]
-
-# Known Issues
-- Possibly, incorrect escaping behavior in bytes besides magic and some others.
