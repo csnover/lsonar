@@ -27,6 +27,14 @@ fn test_pattern_classes() {
         r#match(b"abc123", b"%d+", None),
         Ok(Some(convert_to_string_vec(&[b"123"])))
     );
+    assert_eq!(
+        r#match(b"abc123", b"[%D]+", None),
+        Ok(Some(convert_to_string_vec(&[b"abc"])))
+    );
+    assert_eq!(
+        r#match(b"abc123", b"[%A]+", None),
+        Ok(Some(convert_to_string_vec(&[b"123"])))
+    );
 }
 
 #[test]

@@ -1,4 +1,5 @@
 use super::{Error, Result};
+use std::ops::Bound;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct CharSet {
@@ -12,17 +13,20 @@ impl Default for CharSet {
 }
 
 impl CharSet {
+    #[must_use]
     pub const fn new() -> Self {
         CharSet {
             bytes: [false; 256],
         }
     }
 
+    #[must_use]
     pub const fn full() -> Self {
         CharSet { bytes: [true; 256] }
     }
 
-    pub fn add_byte(&mut self, b: u8) {
+    #[inline]
+    pub const fn add_byte(&mut self, b: u8) {
         self.bytes[b as usize] = true;
     }
 
@@ -32,104 +36,102 @@ impl CharSet {
                 "invalid range in character class".to_string(),
             ));
         }
-        for b in start..=end {
-            self.add_byte(b);
-        }
+        self.bytes[to_usize(start..=end)].fill(true);
         Ok(())
+    }
+
+    #[inline]
+    fn fill(&mut self, indexes: impl IntoIterator<Item = u8>, invert: bool) {
+        let indexes = indexes.into_iter().map(usize::from);
+
+        let mut on = invert;
+        let mut index = 0;
+        for next in indexes {
+            if on {
+                self.bytes[index..next].fill(true);
+            }
+            on = !on;
+            index = next;
+        }
+
+        if on {
+            self.bytes[index..256].fill(true);
+        }
     }
 
     pub fn add_class(&mut self, class_byte: u8) -> Result<()> {
-        match class_byte {
+        let invert = class_byte.is_ascii_uppercase();
+        match class_byte.to_ascii_lowercase() {
             b'a' => {
-                for b in b'a'..=b'z' {
-                    self.add_byte(b);
-                }
-                for b in b'A'..=b'Z' {
-                    self.add_byte(b);
-                }
+                self.fill([b'A', b'Z' + 1, b'a', b'z' + 1], invert);
             }
             b'c' => {
-                for b in 0x00..=0x1f {
-                    self.add_byte(b);
-                }
-                self.add_byte(0x7f);
+                self.fill([0x00, 0x1f + 1, 0x7f, 0x7f + 1], invert);
             }
             b'd' => {
-                for b in b'0'..=b'9' {
-                    self.add_byte(b);
-                }
+                self.fill([b'0', b'9' + 1], invert);
             }
             b'g' => {
-                for b in 0x21..=0x7e {
-                    self.add_byte(b);
-                }
+                self.fill([0x21, 0x7e + 1], invert);
             }
             b'l' => {
-                for b in b'a'..=b'z' {
-                    self.add_byte(b);
-                }
+                self.fill([b'a', b'z' + 1], invert);
             }
             b'p' => {
-                for b in 0x20..=0x7e {
-                    if !((b'a'..=b'z').contains(&b)
-                        || (b'A'..=b'Z').contains(&b)
-                        || (b'0'..=b'9').contains(&b))
-                    {
-                        self.add_byte(b);
-                    }
-                }
+                self.fill(
+                    [
+                        b' ',
+                        b'/' + 1,
+                        b':',
+                        b'@' + 1,
+                        b'[',
+                        b'`' + 1,
+                        b'{',
+                        b'~' + 1,
+                    ],
+                    invert,
+                );
             }
             b's' => {
-                for &b in &[b' ', b'\t', b'\n', b'\r', 0x0b, 0x0c] {
-                    self.add_byte(b);
-                }
+                self.fill([b'\t', b'\t' + 1, b'\n', b'\r' + 1, b' ', b' ' + 1], invert);
             }
             b'u' => {
-                for b in b'A'..=b'Z' {
-                    self.add_byte(b);
-                }
+                self.fill([b'A', b'Z' + 1], invert);
             }
             b'w' => {
-                for b in b'a'..=b'z' {
-                    self.add_byte(b);
-                }
-                for b in b'A'..=b'Z' {
-                    self.add_byte(b);
-                }
-                for b in b'0'..=b'9' {
-                    self.add_byte(b);
-                }
+                self.fill([b'0', b'9' + 1, b'A', b'Z' + 1, b'a', b'z' + 1], invert);
             }
             b'x' => {
-                for b in b'0'..=b'9' {
-                    self.add_byte(b);
-                }
-                for b in b'a'..=b'f' {
-                    self.add_byte(b);
-                }
-                for b in b'A'..=b'F' {
-                    self.add_byte(b);
-                }
+                self.fill([b'0', b'9' + 1, b'A', b'F' + 1, b'a', b'f' + 1], invert);
             }
             _ => {
                 return Err(Error::Parser(format!(
-                    "invalid byte class '%{:?}'",
-                    class_byte
+                    "invalid byte class '%{class_byte:?}'"
                 )));
             }
         }
+
         Ok(())
     }
 
-    #[inline(always)]
-    pub fn contains(&self, b: u8) -> bool {
+    #[inline]
+    #[must_use]
+    pub const fn contains(&self, b: u8) -> bool {
         self.bytes[b as usize]
     }
 
-    #[inline(always)]
+    #[inline]
     pub fn invert(&mut self) {
         for i in 0..256 {
             self.bytes[i] = !self.bytes[i];
         }
     }
+}
+
+#[inline]
+fn to_usize<R: std::ops::RangeBounds<u8>>(r: R) -> (Bound<usize>, Bound<usize>) {
+    (
+        r.start_bound().map(|n| usize::from(*n)),
+        r.end_bound().map(|n| usize::from(*n)),
+    )
 }
