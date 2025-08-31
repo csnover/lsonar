@@ -124,7 +124,12 @@ fn test_table_replacement() {
     table.insert(b"world", "мир".as_bytes());
 
     assert_eq!(
-        gsub(b"hello world", b"%w+", Repl::Table(&table), None),
+        gsub(
+            b"hello world",
+            b"%w+",
+            Repl::Table(&|key| table.get(key).map(|v| v.to_vec())),
+            None
+        ),
         Ok(("привет мир".as_bytes().to_vec(), 2))
     );
 }
@@ -135,7 +140,12 @@ fn test_partial_table_replacement() {
     table.insert(b"hello".as_slice(), "привет".as_bytes());
 
     assert_eq!(
-        gsub(b"hello world", b"%w+", Repl::Table(&table), None),
+        gsub(
+            b"hello world",
+            b"%w+",
+            Repl::Table(&|key| table.get(key).map(|v| v.to_vec())),
+            None
+        ),
         Ok(("привет world".as_bytes().to_vec(), 2))
     );
 }
@@ -147,7 +157,12 @@ fn test_table_with_captures() {
     table.insert(b"age", "возраст".as_bytes());
 
     assert_eq!(
-        gsub(b"name=John age=25", b"(%w+)=%w+", Repl::Table(&table), None),
+        gsub(
+            b"name=John age=25",
+            b"(%w+)=%w+",
+            Repl::Table(&|key| table.get(key).map(|v| v.to_vec())),
+            None
+        ),
         Ok(("имя возраст".as_bytes().to_vec(), 2))
     );
 }

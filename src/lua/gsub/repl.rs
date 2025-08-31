@@ -1,10 +1,21 @@
-use std::collections::HashMap;
+type Key<'a> = &'a [u8];
+type Captures<'a> = &'a [&'a [u8]];
 
+/// String replacement strategy.
 #[derive(Clone, Copy)]
 pub enum Repl<'a> {
+    /// The string value is used for replacement. The character `%` works as an
+    /// escape character: any sequence in repl of the form `%d`, with `d`
+    /// between 1 and 9, stands for the value of the `d`-th captured substring;
+    /// the sequence `%0` stands for the whole match; the sequence `%%` stands
+    /// for a single `%`.
     String(&'a [u8]),
-    Function(&'a dyn Fn(&[&[u8]]) -> Vec<u8>),
-    Table(&'a HashMap<&'a [u8], &'a [u8]>),
+    /// This function is called every time a match occurs, with all captured
+    /// substrings passed as a slice, in order.
+    Function(&'a dyn Fn(Captures<'_>) -> Vec<u8>),
+    /// This function is queried for every match, using the first capture as the
+    /// key.
+    Table(&'a dyn Fn(Key<'_>) -> Option<Vec<u8>>),
 }
 
 enum ReplToken {
