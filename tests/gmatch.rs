@@ -1,10 +1,10 @@
 use lsonar::{Result, gmatch};
 
-fn convert_to_string_vec(items: &[&str]) -> Vec<String> {
-    items.iter().map(|&s| s.to_string()).collect()
+fn convert_to_string_vec(items: &[&[u8]]) -> Vec<Vec<u8>> {
+    items.iter().map(|&s| s.to_vec()).collect()
 }
 
-fn collect_gmatch_results(text: &str, pattern: &str) -> Result<Vec<Vec<String>>> {
+fn collect_gmatch_results(text: &[u8], pattern: &[u8]) -> Result<Vec<Vec<Vec<u8>>>> {
     let it = gmatch(text, pattern)?;
     it.collect()
 }
@@ -12,18 +12,18 @@ fn collect_gmatch_results(text: &str, pattern: &str) -> Result<Vec<Vec<String>>>
 #[test]
 fn test_single_match() {
     assert_eq!(
-        collect_gmatch_results("hello world", "hello"),
-        Ok(vec![convert_to_string_vec(&["hello"])])
+        collect_gmatch_results(b"hello world", b"hello"),
+        Ok(vec![convert_to_string_vec(&[b"hello"])])
     );
 }
 
 #[test]
 fn test_repeated_match() {
     assert_eq!(
-        collect_gmatch_results("hello hello", "hello"),
+        collect_gmatch_results(b"hello hello", b"hello"),
         Ok(vec![
-            convert_to_string_vec(&["hello"]),
-            convert_to_string_vec(&["hello"])
+            convert_to_string_vec(&[b"hello"]),
+            convert_to_string_vec(&[b"hello"])
         ])
     );
 }
@@ -31,10 +31,10 @@ fn test_repeated_match() {
 #[test]
 fn test_numeric_pattern() {
     assert_eq!(
-        collect_gmatch_results("abc123def456", "%d+"),
+        collect_gmatch_results(b"abc123def456", b"%d+"),
         Ok(vec![
-            convert_to_string_vec(&["123"]),
-            convert_to_string_vec(&["456"])
+            convert_to_string_vec(&[b"123"]),
+            convert_to_string_vec(&[b"456"])
         ])
     );
 }
@@ -42,10 +42,10 @@ fn test_numeric_pattern() {
 #[test]
 fn test_captures() {
     assert_eq!(
-        collect_gmatch_results("name=John age=25", "(%a+)=(%w+)"),
+        collect_gmatch_results(b"name=John age=25", b"(%a+)=(%w+)"),
         Ok(vec![
-            convert_to_string_vec(&["name", "John"]),
-            convert_to_string_vec(&["age", "25"])
+            convert_to_string_vec(&[b"name", b"John"]),
+            convert_to_string_vec(&[b"age", b"25"])
         ])
     );
 }
@@ -53,11 +53,11 @@ fn test_captures() {
 #[test]
 fn test_single_char_captures() {
     assert_eq!(
-        collect_gmatch_results("a=1 b=2 c=3", "(%a)=(%d)"),
+        collect_gmatch_results(b"a=1 b=2 c=3", b"(%a)=(%d)"),
         Ok(vec![
-            convert_to_string_vec(&["a", "1"]),
-            convert_to_string_vec(&["b", "2"]),
-            convert_to_string_vec(&["c", "3"])
+            convert_to_string_vec(&[b"a", b"1"]),
+            convert_to_string_vec(&[b"b", b"2"]),
+            convert_to_string_vec(&[b"c", b"3"])
         ])
     );
 }
@@ -65,18 +65,18 @@ fn test_single_char_captures() {
 #[test]
 fn test_empty_captures() {
     assert_eq!(
-        collect_gmatch_results("abc", "()a()"),
-        Ok(vec![convert_to_string_vec(&["", ""])])
+        collect_gmatch_results(b"abc", b"()a()"),
+        Ok(vec![convert_to_string_vec(&[b"", b""])])
     );
 }
 
 #[test]
 fn test_empty_pattern() {
-    let result = collect_gmatch_results("abc", "").unwrap();
+    let result = collect_gmatch_results(b"abc", b"").unwrap();
     assert_eq!(result.len(), 4);
 
     for r in &result {
-        assert_eq!(r, &convert_to_string_vec(&[""]));
+        assert_eq!(r, &convert_to_string_vec(&[b""]));
     }
 }
 
@@ -84,12 +84,12 @@ fn test_empty_pattern() {
 fn test_ip_address_pattern() {
     assert_eq!(
         collect_gmatch_results(
-            "IPv4: 192.168.1.1 and 10.0.0.1",
-            "(%d+)%.(%d+)%.(%d+)%.(%d+)"
+            b"IPv4: 192.168.1.1 and 10.0.0.1",
+            b"(%d+)%.(%d+)%.(%d+)%.(%d+)"
         ),
         Ok(vec![
-            convert_to_string_vec(&["192", "168", "1", "1"]),
-            convert_to_string_vec(&["10", "0", "0", "1"])
+            convert_to_string_vec(&[b"192", b"168", b"1", b"1"]),
+            convert_to_string_vec(&[b"10", b"0", b"0", b"1"])
         ])
     );
 }
@@ -97,10 +97,10 @@ fn test_ip_address_pattern() {
 #[test]
 fn test_html_tag_content() {
     assert_eq!(
-        collect_gmatch_results("<p>First</p><p>Second</p>", "<p>([^<]+)</p>"),
+        collect_gmatch_results(b"<p>First</p><p>Second</p>", b"<p>([^<]+)</p>"),
         Ok(vec![
-            convert_to_string_vec(&["First"]),
-            convert_to_string_vec(&["Second"])
+            convert_to_string_vec(&[b"First"]),
+            convert_to_string_vec(&[b"Second"])
         ])
     );
 }
@@ -108,34 +108,34 @@ fn test_html_tag_content() {
 #[test]
 fn test_no_matches() {
     assert_eq!(
-        collect_gmatch_results("hello world", "not found"),
+        collect_gmatch_results(b"hello world", b"not found"),
         Ok(vec![])
     );
 }
 
 #[test]
 fn test_empty_string() {
-    assert_eq!(collect_gmatch_results("", "pattern"), Ok(vec![]));
+    assert_eq!(collect_gmatch_results(b"", b"pattern"), Ok(vec![]));
 }
 
 #[test]
 fn test_single_char_repeated() {
     assert_eq!(
-        collect_gmatch_results("aaa", "a"),
+        collect_gmatch_results(b"aaa", b"a"),
         Ok(vec![
-            convert_to_string_vec(&["a"]),
-            convert_to_string_vec(&["a"]),
-            convert_to_string_vec(&["a"])
+            convert_to_string_vec(&[b"a"]),
+            convert_to_string_vec(&[b"a"]),
+            convert_to_string_vec(&[b"a"])
         ])
     );
 }
 
 #[test]
 fn test_dot_pattern() {
-    let result = collect_gmatch_results("hello world", ".").unwrap();
+    let result = collect_gmatch_results(b"hello world", b".").unwrap();
     assert_eq!(result.len(), 11);
 
     for (i, v) in result.into_iter().enumerate() {
-        assert_eq!(v[0], "hello world".chars().nth(i).unwrap().to_string());
+        assert_eq!(v[0], vec![b"hello world"[i]]);
     }
 }

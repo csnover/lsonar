@@ -6,12 +6,11 @@ use super::{
 /// Corresponds to Lua 5.3 [`string.find`].
 /// Returns 1-based or 0-based (see features [`1-based`] and [`0-based`]) indices (start, end) and captured strings. The [`init`] argument can be either 0-based or 1-based.
 pub fn find(
-    text: &str,
-    pattern: &str,
+    text_bytes: &[u8],
+    pattern: &[u8],
     init: Option<isize>,
     plain: bool,
-) -> Result<Option<(usize, usize, Vec<String>)>> {
-    let text_bytes = text.as_bytes();
+) -> Result<Option<(usize, usize, Vec<Vec<u8>>)>> {
     let byte_len = text_bytes.len();
 
     let start_byte_index = calculate_start_index(byte_len, init);
@@ -35,7 +34,7 @@ pub fn find(
 
         if let Some(rel_byte_pos) = text_bytes[start_byte_index..]
             .windows(pattern.len())
-            .position(|window| window == pattern.as_bytes())
+            .position(|window| window == pattern)
         {
             let zero_based_start_pos = start_byte_index + rel_byte_pos;
             let zero_based_end_pos = zero_based_start_pos + pattern.len();
@@ -65,12 +64,9 @@ pub fn find(
                 };
                 let end_pos = match_byte_range.end;
 
-                let captured_strings: Vec<String> = captures_byte_ranges
+                let captured_strings: Vec<Vec<u8>> = captures_byte_ranges
                     .into_iter()
-                    .filter_map(|maybe_range| {
-                        maybe_range
-                            .map(|range| String::from_utf8_lossy(&text_bytes[range]).into_owned())
-                    })
+                    .filter_map(|maybe_range| maybe_range.map(|range| text_bytes[range].to_owned()))
                     .collect();
 
                 Ok(Some((start_pos, end_pos, captured_strings)))

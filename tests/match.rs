@@ -1,107 +1,107 @@
 use lsonar::r#match;
 
-fn convert_to_string_vec(items: &[&str]) -> Vec<String> {
-    items.iter().map(|&s| s.to_string()).collect()
+fn convert_to_string_vec(items: &[&[u8]]) -> Vec<Vec<u8>> {
+    items.iter().map(|&s| s.to_vec()).collect()
 }
 
 #[test]
 fn test_simple_match() {
     assert_eq!(
-        r#match("hello world", "hello", None),
-        Ok(Some(convert_to_string_vec(&["hello"])))
+        r#match(b"hello world", b"hello", None),
+        Ok(Some(vec![b"hello".to_vec()]))
     );
     assert_eq!(
-        r#match("hello world", "world", None),
-        Ok(Some(convert_to_string_vec(&["world"])))
+        r#match(b"hello world", b"world", None),
+        Ok(Some(vec![b"world".to_vec()]))
     );
-    assert_eq!(r#match("hello world", "bye", None), Ok(None));
+    assert_eq!(r#match(b"hello world", b"bye", None), Ok(None));
 }
 
 #[test]
 fn test_pattern_classes() {
     assert_eq!(
-        r#match("abc123", "%a+", None),
-        Ok(Some(convert_to_string_vec(&["abc"])))
+        r#match(b"abc123", b"%a+", None),
+        Ok(Some(convert_to_string_vec(&[b"abc"])))
     );
     assert_eq!(
-        r#match("abc123", "%d+", None),
-        Ok(Some(convert_to_string_vec(&["123"])))
+        r#match(b"abc123", b"%d+", None),
+        Ok(Some(convert_to_string_vec(&[b"123"])))
     );
 }
 
 #[test]
 fn test_single_capture() {
     assert_eq!(
-        r#match("hello world", "(hello)", None),
-        Ok(Some(convert_to_string_vec(&["hello"])))
+        r#match(b"hello world", b"(hello)", None),
+        Ok(Some(convert_to_string_vec(&[b"hello"])))
     );
 }
 
 #[test]
 fn test_multiple_captures() {
     assert_eq!(
-        r#match("hello world", "(hello) (world)", None),
-        Ok(Some(convert_to_string_vec(&["hello", "world"])))
+        r#match(b"hello world", b"(hello) (world)", None),
+        Ok(Some(convert_to_string_vec(&[b"hello", b"world"])))
     );
     assert_eq!(
-        r#match("123-456-7890", "(%d+)%-(%d+)%-(%d+)", None),
-        Ok(Some(convert_to_string_vec(&["123", "456", "7890"])))
+        r#match(b"123-456-7890", b"(%d+)%-(%d+)%-(%d+)", None),
+        Ok(Some(convert_to_string_vec(&[b"123", b"456", b"7890"])))
     );
 }
 
 #[test]
 fn test_combined_pattern_captures() {
     assert_eq!(
-        r#match("abc123", "(%a+)(%d+)", None),
-        Ok(Some(convert_to_string_vec(&["abc", "123"])))
+        r#match(b"abc123", b"(%a+)(%d+)", None),
+        Ok(Some(convert_to_string_vec(&[b"abc", b"123"])))
     );
 }
 
 #[test]
 fn test_empty_captures() {
     assert_eq!(
-        r#match("hello", "(h)()ello", None),
-        Ok(Some(convert_to_string_vec(&["h", ""])))
+        r#match(b"hello", b"(h)()ello", None),
+        Ok(Some(convert_to_string_vec(&[b"h", b""])))
     );
 }
 
 #[test]
 fn test_init_parameter() {
     assert_eq!(
-        r#match("hello world", "world", Some(6)),
-        Ok(Some(convert_to_string_vec(&["world"])))
+        r#match(b"hello world", b"world", Some(6)),
+        Ok(Some(convert_to_string_vec(&[b"world"])))
     );
     assert_eq!(
-        r#match("hello world", "hello", Some(1)),
-        Ok(Some(convert_to_string_vec(&["hello"])))
+        r#match(b"hello world", b"hello", Some(1)),
+        Ok(Some(convert_to_string_vec(&[b"hello"])))
     );
-    assert_eq!(r#match("hello world", "hello", Some(2)), Ok(None));
+    assert_eq!(r#match(b"hello world", b"hello", Some(2)), Ok(None));
 }
 
 #[test]
 fn test_empty_string_edge_cases() {
     assert_eq!(
-        r#match("", "", None),
-        Ok(Some(convert_to_string_vec(&[""])))
+        r#match(b"", b"", None),
+        Ok(Some(convert_to_string_vec(&[b""])))
     );
     assert_eq!(
-        r#match("", "^$", None),
-        Ok(Some(convert_to_string_vec(&[""])))
+        r#match(b"", b"^$", None),
+        Ok(Some(convert_to_string_vec(&[b""])))
     );
 }
 
 #[test]
 fn test_anchor_patterns() {
     assert_eq!(
-        r#match("hello", "^", None),
-        Ok(Some(convert_to_string_vec(&[""])))
+        r#match(b"hello", b"^", None),
+        Ok(Some(convert_to_string_vec(&[b""])))
     );
     assert_eq!(
-        r#match("hello", "$", None),
-        Ok(Some(convert_to_string_vec(&[""])))
+        r#match(b"hello", b"$", None),
+        Ok(Some(convert_to_string_vec(&[b""])))
     );
     assert_eq!(
-        r#match("hello", "^hello$", None),
-        Ok(Some(convert_to_string_vec(&["hello"])))
+        r#match(b"hello", b"^hello$", None),
+        Ok(Some(convert_to_string_vec(&[b"hello"])))
     );
 }

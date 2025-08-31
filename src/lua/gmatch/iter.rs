@@ -8,7 +8,7 @@ pub struct GMatchIterator {
 }
 
 impl Iterator for GMatchIterator {
-    type Item = Result<Vec<String>>;
+    type Item = Result<Vec<Vec<u8>>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.current_pos > self.bytes.len() {
@@ -16,7 +16,7 @@ impl Iterator for GMatchIterator {
         }
 
         if self.is_empty_pattern {
-            let result = Some(Ok(vec![String::new()]));
+            let result = Some(Ok(vec![vec![]]));
 
             self.current_pos += 1;
 
@@ -34,20 +34,15 @@ impl Iterator for GMatchIterator {
                     self.current_pos = match_range.end;
                 }
 
-                let result: Vec<String> = if captures.iter().any(|c| c.is_some()) {
+                let result: Vec<Vec<u8>> = if captures.iter().any(|c| c.is_some()) {
                     captures
                         .into_iter()
                         .filter_map(|maybe_range| {
-                            maybe_range.map(|range| {
-                                String::from_utf8_lossy(&self.bytes[range]).into_owned()
-                            })
+                            maybe_range.map(|range| self.bytes[range].to_owned())
                         })
                         .collect()
                 } else {
-                    vec![
-                        String::from_utf8_lossy(&self.bytes[match_range.start..match_range.end])
-                            .into_owned(),
-                    ]
+                    vec![self.bytes[match_range.start..match_range.end].to_owned()]
                 };
 
                 Some(Ok(result))

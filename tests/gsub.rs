@@ -1,27 +1,27 @@
-use lsonar::{Repl, gsub};
+use lsonar::{gsub, Repl};
 use std::collections::HashMap;
 
 #[test]
 fn test_basic_replacement() {
     assert_eq!(
-        gsub("hello world", "l", Repl::String("L"), None),
-        Ok(("heLLo worLd".to_string(), 3))
+        gsub(b"hello world", b"l", Repl::String(b"L"), None),
+        Ok((b"heLLo worLd".to_vec(), 3))
     );
 }
 
 #[test]
 fn test_limited_replacement_count() {
     assert_eq!(
-        gsub("hello world", "l", Repl::String("L"), Some(2)),
-        Ok(("heLLo world".to_string(), 2))
+        gsub(b"hello world", b"l", Repl::String(b"L"), Some(2)),
+        Ok((b"heLLo world".to_vec(), 2))
     );
 }
 
 #[test]
 fn test_zero_replacement_count() {
     assert_eq!(
-        gsub("hello", ".", Repl::String("x"), Some(0)),
-        Ok(("hello".to_string(), 0))
+        gsub(b"hello", b".", Repl::String(b"x"), Some(0)),
+        Ok((b"hello".to_vec(), 0))
     );
 }
 
@@ -29,36 +29,41 @@ fn test_zero_replacement_count() {
 fn test_pattern_with_captures() {
     assert_eq!(
         gsub(
-            "name=John age=25",
-            "(%w+)=(%w+)",
-            Repl::String("%2 is %1"),
+            b"name=John age=25",
+            b"(%w+)=(%w+)",
+            Repl::String(b"%2 is %1"),
             None
         ),
-        Ok(("John is name 25 is age".to_string(), 2))
+        Ok((b"John is name 25 is age".to_vec(), 2))
     );
 }
 
 #[test]
 fn test_numeric_pattern() {
     assert_eq!(
-        gsub("hello 123 world 456", "%d+", Repl::String("<number>"), None),
-        Ok(("hello <number> world <number>".to_string(), 2))
+        gsub(
+            b"hello 123 world 456",
+            b"%d+",
+            Repl::String(b"<number>"),
+            None
+        ),
+        Ok((b"hello <number> world <number>".to_vec(), 2))
     );
 }
 
 #[test]
 fn test_empty_pattern() {
     assert_eq!(
-        gsub("hello", "", Repl::String("-"), None),
-        Ok(("-h-e-l-l-o-".to_string(), 6))
+        gsub(b"hello", b"", Repl::String(b"-"), None),
+        Ok((b"-h-e-l-l-o-".to_vec(), 6))
     );
 }
 
 #[test]
 fn test_escape_percent_in_replacement() {
     assert_eq!(
-        gsub("hello", "e", Repl::String("%% escaped"), None),
-        Ok(("h% escapedllo".to_string(), 1))
+        gsub(b"hello", b"e", Repl::String(b"%% escaped"), None),
+        Ok((b"h% escapedllo".to_vec(), 1))
     );
 }
 
@@ -66,13 +71,13 @@ fn test_escape_percent_in_replacement() {
 fn test_complex_pattern_with_captures() {
     assert_eq!(
         gsub(
-            "User: John, Age: 25, Email: john@example.com",
-            "(User: )(%w+)(, Age: )(%d+)",
-            Repl::String("%1%2%3%4 (adult)"),
+            b"User: John, Age: 25, Email: john@example.com",
+            b"(User: )(%w+)(, Age: )(%d+)",
+            Repl::String(b"%1%2%3%4 (adult)"),
             None
         ),
         Ok((
-            "User: John, Age: 25 (adult), Email: john@example.com".to_string(),
+            b"User: John, Age: 25 (adult), Email: john@example.com".to_vec(),
             1
         ))
     );
@@ -82,12 +87,14 @@ fn test_complex_pattern_with_captures() {
 fn test_function_replacement() {
     assert_eq!(
         gsub(
-            "hello world",
-            "%w+",
-            Repl::Function(Box::new(|captures: &[&str]| { captures[0].to_uppercase() })),
+            b"hello world",
+            b"%w+",
+            Repl::Function(Box::new(|captures: &[&[u8]]| {
+                captures[0].to_ascii_uppercase()
+            })),
             None
         ),
-        Ok(("HELLO WORLD".to_string(), 2))
+        Ok((b"HELLO WORLD".to_vec(), 2))
     );
 }
 
@@ -95,68 +102,70 @@ fn test_function_replacement() {
 fn test_function_with_captures() {
     assert_eq!(
         gsub(
-            "a=1, b=2, c=3",
-            "(%w)=(%d)",
-            Repl::Function(Box::new(|captures: &[&str]| {
+            b"a=1, b=2, c=3",
+            b"(%w)=(%d)",
+            Repl::Function(Box::new(|captures: &[&[u8]]| {
                 format!(
                     "{}={}",
-                    captures[1],
-                    captures[2].parse::<i32>().unwrap() * 2
+                    str::from_utf8(captures[1]).unwrap(),
+                    str::from_utf8(captures[2]).unwrap().parse::<i32>().unwrap() * 2
                 )
+                .as_bytes()
+                .to_vec()
             })),
             None
         ),
-        Ok(("a=2, b=4, c=6".to_string(), 3))
+        Ok((b"a=2, b=4, c=6".to_vec(), 3))
     );
 }
 
 #[test]
 fn test_table_replacement() {
     let mut table = HashMap::new();
-    table.insert("hello".to_string(), "привет".to_string());
-    table.insert("world".to_string(), "мир".to_string());
+    table.insert(b"hello".as_slice(), "привет".as_bytes());
+    table.insert(b"world", "мир".as_bytes());
 
     assert_eq!(
-        gsub("hello world", "%w+", Repl::Table(&table), None),
-        Ok(("привет мир".to_string(), 2))
+        gsub(b"hello world", b"%w+", Repl::Table(&table), None),
+        Ok(("привет мир".as_bytes().to_vec(), 2))
     );
 }
 
 #[test]
 fn test_partial_table_replacement() {
     let mut table = HashMap::new();
-    table.insert("hello".to_string(), "привет".to_string());
+    table.insert(b"hello".as_slice(), "привет".as_bytes());
 
     assert_eq!(
-        gsub("hello world", "%w+", Repl::Table(&table), None),
-        Ok(("привет world".to_string(), 2))
+        gsub(b"hello world", b"%w+", Repl::Table(&table), None),
+        Ok(("привет world".as_bytes().to_vec(), 2))
     );
 }
 
 #[test]
 fn test_table_with_captures() {
     let mut table = HashMap::new();
-    table.insert("name".to_string(), "имя".to_string());
-    table.insert("age".to_string(), "возраст".to_string());
+    table.insert(b"name".as_slice(), "имя".as_bytes());
+    table.insert(b"age", "возраст".as_bytes());
 
     assert_eq!(
-        gsub("name=John age=25", "(%w+)=%w+", Repl::Table(&table), None),
-        Ok(("имя возраст".to_string(), 2))
+        gsub(b"name=John age=25", b"(%w+)=%w+", Repl::Table(&table), None),
+        Ok(("имя возраст".as_bytes().to_vec(), 2))
     );
 }
 
 #[test]
 fn test_empty_string() {
     assert_eq!(
-        gsub("", "pattern", Repl::String("repl"), None),
-        Ok(("".to_string(), 0))
+        gsub(b"", b"pattern", Repl::String(b"repl"), None),
+        Ok((b"".to_vec(), 0))
     );
 }
 
 #[test]
 fn test_pattern_not_found() {
     assert_eq!(
-        gsub("hello", "x", Repl::String("y"), None),
-        Ok(("hello".to_string(), 0))
+        gsub(b"hello", b"x", Repl::String(b"y"), None),
+        Ok((b"hello".to_vec(), 0))
     );
 }

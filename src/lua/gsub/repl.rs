@@ -2,9 +2,9 @@ use crate::Result;
 use std::collections::HashMap;
 
 pub enum Repl<'a> {
-    String(&'a str),
-    Function(Box<dyn Fn(&[&str]) -> String + 'a>),
-    Table(&'a HashMap<String, String>),
+    String(&'a [u8]),
+    Function(Box<dyn Fn(&[&[u8]]) -> Vec<u8> + 'a>),
+    Table(&'a HashMap<&'a [u8], &'a [u8]>),
 }
 
 enum ReplToken {
@@ -12,18 +12,18 @@ enum ReplToken {
     CaptureRef(usize),
 }
 
-pub fn process_replacement_string(repl: &str, captures: &[&str]) -> Result<String> {
+pub fn process_replacement_string(repl: &[u8], captures: &[&[u8]]) -> Result<Vec<u8>> {
     let tokens = tokenize_replacement_string(repl);
-    let mut result = String::with_capacity(tokens.len());
+    let mut result = Vec::with_capacity(tokens.len());
 
     for token in tokens {
         match token {
             ReplToken::Literal(b) => {
-                result.push(b as char);
+                result.push(b);
             }
             ReplToken::CaptureRef(idx) => {
                 if idx <= captures.len() {
-                    result.push_str(captures[idx - 1]);
+                    result.extend(captures[idx - 1]);
                 }
             }
         }
@@ -32,14 +32,13 @@ pub fn process_replacement_string(repl: &str, captures: &[&str]) -> Result<Strin
     Ok(result)
 }
 
-fn tokenize_replacement_string(repl: &str) -> Vec<ReplToken> {
+fn tokenize_replacement_string(repl: &[u8]) -> Vec<ReplToken> {
     let mut tokens = Vec::new();
-    let bytes = repl.as_bytes();
     let mut i = 0;
 
-    while i < bytes.len() {
-        if bytes[i] == b'%' && i + 1 < bytes.len() {
-            let next_byte = bytes[i + 1];
+    while i < repl.len() {
+        if repl[i] == b'%' && i + 1 < repl.len() {
+            let next_byte = repl[i + 1];
             if (b'1'..=b'9').contains(&next_byte) {
                 let capture_idx = (next_byte - b'0') as usize;
                 tokens.push(ReplToken::CaptureRef(capture_idx));
@@ -52,7 +51,7 @@ fn tokenize_replacement_string(repl: &str) -> Vec<ReplToken> {
                 i += 1;
             }
         } else {
-            tokens.push(ReplToken::Literal(bytes[i]));
+            tokens.push(ReplToken::Literal(repl[i]));
             i += 1;
         }
     }
