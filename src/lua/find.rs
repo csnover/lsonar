@@ -1,7 +1,9 @@
 use super::{
-    super::{engine::find_first_match, Parser, Result},
+    super::{Parser, Result, engine::find_first_match},
     calculate_start_index,
 };
+
+pub type Captures = Vec<Vec<u8>>;
 
 /// Corresponds to Lua 5.3 [`string.find`].
 /// Returns 1-based or 0-based (see features [`1-based`] and [`0-based`]) indices (start, end) and captured strings. The [`init`] argument can be either 0-based or 1-based.
@@ -10,7 +12,7 @@ pub fn find(
     pattern: &[u8],
     init: Option<isize>,
     plain: bool,
-) -> Result<Option<(usize, usize, Vec<Vec<u8>>)>> {
+) -> Result<Option<(usize, usize, Captures)>> {
     let byte_len = text_bytes.len();
 
     let start_byte_index = calculate_start_index(byte_len, init);
@@ -23,9 +25,8 @@ pub fn find(
                     start_byte_index,
                     vec![],
                 )));
-            } else {
-                return Ok(Some((start_byte_index, start_byte_index, vec![])));
             }
+            return Ok(Some((start_byte_index, start_byte_index, vec![])));
         }
 
         if start_byte_index >= byte_len {

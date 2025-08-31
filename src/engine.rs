@@ -1,10 +1,11 @@
 use std::ops::Range;
 
 use super::{
-    ast::{AstNode, Quantifier},
     Result,
+    ast::{AstNode, Quantifier},
 };
-use state::{State, MAX_RECURSION_DEPTH};
+pub use state::Captures;
+use state::{MAX_RECURSION_DEPTH, State};
 
 mod state;
 
@@ -15,7 +16,7 @@ pub fn find_first_match(
     pattern_ast: &[AstNode],
     input: &[u8],
     start_index: usize,
-) -> Result<Option<(Range<usize>, Vec<Option<Range<usize>>>)>> {
+) -> Result<Option<(Range<usize>, Captures)>> {
     let input_len = input.len();
 
     if start_index > input_len {
@@ -36,13 +37,14 @@ pub fn find_first_match(
                 break;
             }
         }
-        if pattern_ast.len() == 1 {
-            if let Some(AstNode::AnchorEnd) = pattern_ast.first() {
-                if i < input_len {
-                    continue;
-                }
-            }
-        }
+        // TODO: What is missing here? This is a no-op
+        // if pattern_ast.len() == 1 {
+        //     if let Some(AstNode::AnchorEnd) = pattern_ast.first() {
+        //         if i < input_len {
+        //             continue;
+        //         }
+        //     }
+        // }
     }
 
     Ok(None)
@@ -61,7 +63,7 @@ fn match_recursive(ast: &[AstNode], mut state: State) -> Option<State> {
     let node = ast.first().unwrap();
     let remaining_ast = ast.get(1..).unwrap_or(&[]);
 
-    let result = match node {
+    match node {
         AstNode::Literal(b) => {
             if state.current_byte() == Some(*b) {
                 state.current_pos += 1;
@@ -166,11 +168,7 @@ fn match_recursive(ast: &[AstNode], mut state: State) -> Option<State> {
             match quantifier {
                 Quantifier::Star | Quantifier::Plus => {
                     // Greedy *, +
-                    let min_matches = if *quantifier == Quantifier::Plus {
-                        1
-                    } else {
-                        0
-                    };
+                    let min_matches = usize::from(*quantifier == Quantifier::Plus);
                     match_greedy_quantifier(item.as_ref(), remaining_ast, state, min_matches)
                 }
                 Quantifier::Question => {
@@ -190,8 +188,7 @@ fn match_recursive(ast: &[AstNode], mut state: State) -> Option<State> {
                 }
             }
         }
-    };
-    result
+    }
 }
 
 fn match_greedy_quantifier(
@@ -252,9 +249,8 @@ fn match_non_greedy_quantifier(
             if next_state.current_pos == current_state.current_pos {
                 if let Some(final_state) = match_recursive(remaining_ast, next_state.clone()) {
                     return Some(final_state.clone());
-                } else {
-                    return None;
                 }
+                return None;
             }
             current_state = next_state;
         } else {

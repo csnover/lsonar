@@ -1,9 +1,9 @@
-use crate::Result;
 use std::collections::HashMap;
 
+#[derive(Clone, Copy)]
 pub enum Repl<'a> {
     String(&'a [u8]),
-    Function(Box<dyn Fn(&[&[u8]]) -> Vec<u8> + 'a>),
+    Function(&'a dyn Fn(&[&[u8]]) -> Vec<u8>),
     Table(&'a HashMap<&'a [u8], &'a [u8]>),
 }
 
@@ -12,7 +12,7 @@ enum ReplToken {
     CaptureRef(usize),
 }
 
-pub fn process_replacement_string(repl: &[u8], captures: &[&[u8]]) -> Result<Vec<u8>> {
+pub fn process_replacement_string(repl: &[u8], captures: &[&[u8]]) -> Vec<u8> {
     let tokens = tokenize_replacement_string(repl);
     let mut result = Vec::with_capacity(tokens.len());
 
@@ -29,7 +29,7 @@ pub fn process_replacement_string(repl: &[u8], captures: &[&[u8]]) -> Result<Vec
         }
     }
 
-    Ok(result)
+    result
 }
 
 fn tokenize_replacement_string(repl: &[u8]) -> Vec<ReplToken> {

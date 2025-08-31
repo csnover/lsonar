@@ -1,4 +1,4 @@
-use lsonar::{gmatch, Result};
+use lsonar::{Result, gmatch};
 
 fn convert_to_string_vec(items: &[&[u8]]) -> Vec<Vec<u8>> {
     items.iter().map(|&s| s.to_vec()).collect()

@@ -1,4 +1,4 @@
-use lsonar::{gsub, Repl};
+use lsonar::{Repl, gsub};
 use std::collections::HashMap;
 
 #[test]
@@ -89,9 +89,7 @@ fn test_function_replacement() {
         gsub(
             b"hello world",
             b"%w+",
-            Repl::Function(Box::new(|captures: &[&[u8]]| {
-                captures[0].to_ascii_uppercase()
-            })),
+            Repl::Function(&|captures: &[&[u8]]| { captures[0].to_ascii_uppercase() }),
             None
         ),
         Ok((b"HELLO WORLD".to_vec(), 2))
@@ -104,7 +102,7 @@ fn test_function_with_captures() {
         gsub(
             b"a=1, b=2, c=3",
             b"(%w)=(%d)",
-            Repl::Function(Box::new(|captures: &[&[u8]]| {
+            Repl::Function(&|captures: &[&[u8]]| {
                 format!(
                     "{}={}",
                     str::from_utf8(captures[1]).unwrap(),
@@ -112,7 +110,7 @@ fn test_function_with_captures() {
                 )
                 .as_bytes()
                 .to_vec()
-            })),
+            }),
             None
         ),
         Ok((b"a=2, b=4, c=6".to_vec(), 3))

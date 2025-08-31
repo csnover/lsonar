@@ -1,10 +1,10 @@
-use lsonar::{engine::find_first_match, Parser, Result, LUA_MAXCAPTURES};
+use lsonar::{
+    LUA_MAXCAPTURES, Parser, Result,
+    engine::{Captures, find_first_match},
+};
 use std::ops::Range;
 
-fn find(
-    pattern_str: &[u8],
-    text: &[u8],
-) -> Result<Option<(Range<usize>, Vec<Option<Range<usize>>>)>> {
+fn find(pattern_str: &[u8], text: &[u8]) -> Result<Option<(Range<usize>, Captures)>> {
     let mut parser = Parser::new(pattern_str)?;
     let ast = parser.parse()?;
     find_first_match(&ast, text, 0) // 0-based index only for tests

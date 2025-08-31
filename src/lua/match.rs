@@ -1,5 +1,5 @@
 use super::{
-    super::{engine::find_first_match, Parser, Result},
+    super::{Parser, Result, engine::find_first_match},
     calculate_start_index,
 };
 
@@ -19,11 +19,11 @@ pub fn r#match(text: &[u8], pattern: &[u8], init: Option<isize>) -> Result<Optio
                 .filter_map(|maybe_range| maybe_range.map(|range| text[range].to_owned()))
                 .collect();
 
-            if !captures.is_empty() {
-                Ok(Some(captures))
-            } else {
+            if captures.is_empty() {
                 let full_match = text[match_byte_range.start..match_byte_range.end].to_owned();
                 Ok(Some(vec![full_match]))
+            } else {
+                Ok(Some(captures))
             }
         }
         None => Ok(None),

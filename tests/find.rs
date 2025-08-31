@@ -1,8 +1,4 @@
-use lsonar::{find, Error};
-
-fn svec(items: &[&str]) -> Vec<String> {
-    items.iter().map(|&s| s.to_string()).collect()
-}
+use lsonar::{Error, find};
 
 #[test]
 fn test_negative_byte_classes() {

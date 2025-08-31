@@ -1,4 +1,4 @@
-use crate::{engine::find_first_match, AstNode, Result};
+use crate::{AstNode, Result, engine::find_first_match};
 
 pub struct GMatchIterator {
     pub(super) bytes: Vec<u8>,
@@ -34,7 +34,7 @@ impl Iterator for GMatchIterator {
                     self.current_pos = match_range.end;
                 }
 
-                let result: Vec<Vec<u8>> = if captures.iter().any(|c| c.is_some()) {
+                let result: Vec<Vec<u8>> = if captures.iter().any(Option::is_some) {
                     captures
                         .into_iter()
                         .filter_map(|maybe_range| {

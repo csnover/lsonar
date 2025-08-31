@@ -1,6 +1,6 @@
 use lsonar::{
-    lexer::{token::Token, Lexer},
     Error, Result,
+    lexer::{Lexer, token::Token},
 };
 
 fn lex_all(input: &[u8]) -> Result<Vec<Token>> {

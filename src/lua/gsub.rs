@@ -1,4 +1,4 @@
-use super::super::{engine::find_first_match, Parser, Result};
+use super::super::{Parser, Result, engine::find_first_match};
 use repl::process_replacement_string;
 
 mod repl;
@@ -37,9 +37,9 @@ pub fn gsub<'a>(
                     })
                     .collect();
 
-                match &repl {
+                match repl {
                     Repl::String(repl_str) => {
-                        let replacement = process_replacement_string(repl_str, &captures_str)?;
+                        let replacement = process_replacement_string(repl_str, &captures_str);
                         result.extend(&replacement);
                     }
                     Repl::Function(f) => {
@@ -50,10 +50,10 @@ pub fn gsub<'a>(
                         result.extend(&replacement);
                     }
                     Repl::Table(table) => {
-                        let key = if !captures_str.is_empty() {
-                            captures_str[0]
-                        } else {
+                        let key = if captures_str.is_empty() {
                             full_match
+                        } else {
+                            captures_str[0]
                         };
 
                         if let Some(replacement) = table.get(key) {
@@ -71,7 +71,7 @@ pub fn gsub<'a>(
                     if last_pos >= byte_len {
                         break;
                     }
-                    result.extend(&text[last_pos..last_pos + 1]);
+                    result.extend(&text[last_pos..=last_pos]);
                     last_pos += 1;
                 }
             }

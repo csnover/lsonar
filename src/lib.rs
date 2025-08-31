@@ -1,5 +1,5 @@
-#![allow(clippy::type_complexity)]
-#![allow(clippy::manual_is_ascii_check)]
+#![warn(clippy::pedantic, rust_2018_idioms)]
+#![allow(clippy::missing_errors_doc, clippy::too_many_lines)]
 
 pub mod ast;
 pub mod charset;
@@ -12,7 +12,7 @@ pub use self::{
     ast::{AstNode, Quantifier},
     charset::CharSet,
     lexer::{Lexer, Token},
-    lua::{find, gmatch, gsub, r#match, Repl},
+    lua::{Repl, find, gmatch, gsub, r#match},
     parser::Parser,
 };
 
@@ -26,7 +26,7 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::Lexer(s) | Error::Parser(s) | Error::Matcher(s) => write!(f, "{}", s),
+            Error::Lexer(s) | Error::Parser(s) | Error::Matcher(s) => write!(f, "{s}"),
         }
     }
 }

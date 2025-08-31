@@ -44,6 +44,7 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
+    #[must_use]
     pub fn new(input: &'a [u8]) -> Self {
         Lexer {
             input,
@@ -60,7 +61,7 @@ impl<'a> Lexer<'a> {
     fn advance(&mut self) -> Option<u8> {
         let byte = self.peek();
         if byte.is_some() {
-            self.pos += 1
+            self.pos += 1;
         }
         byte
     }
@@ -140,8 +141,7 @@ impl<'a> Lexer<'a> {
                                 Ok(Some(Token::EscapedLiteral(b'%')))
                             }
                             _ => Err(Error::Lexer(format!(
-                                "malformed pattern (invalid escape sequence in set: %{})",
-                                next_byte
+                                "malformed pattern (invalid escape sequence in set: %{next_byte})"
                             ))),
                         }
                     } else {
@@ -178,8 +178,7 @@ impl<'a> Lexer<'a> {
                         b'f' => Ok(Some(Token::Frontier)),
                         d @ b'1'..=b'9' => Ok(Some(Token::CaptureRef(d - b'0'))),
                         _ => Err(Error::Lexer(format!(
-                            "malformed pattern (invalid escape sequence in set: %{})",
-                            next_byte
+                            "malformed pattern (invalid escape sequence in set: %{next_byte})"
                         ))),
                     }
                 }

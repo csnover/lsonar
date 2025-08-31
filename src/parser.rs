@@ -1,15 +1,14 @@
 use super::{
+    Error, LUA_MAXCAPTURES, Result,
     ast::{AstNode, Quantifier},
     charset::CharSet,
     lexer::{Lexer, Token},
-    Error, Result, LUA_MAXCAPTURES,
 };
 use std::iter::Peekable;
 
 const fn token_to_byte(token: &Token) -> u8 {
     match token {
-        Token::Literal(b) => *b,
-        Token::EscapedLiteral(b) => *b,
+        Token::Literal(b) | Token::EscapedLiteral(b) => *b,
         Token::Any => b'.',
         Token::LParen => b'(',
         Token::RParen => b')',
@@ -56,15 +55,13 @@ impl Parser {
 
         if let Some(token) = self.tokens.peek() {
             return Err(Error::Parser(format!(
-                "malformed pattern (unexpected token {:?} after end of pattern)",
-                token
+                "malformed pattern (unexpected token {token:?} after end of pattern)"
             )));
         }
 
         if self.capture_count > LUA_MAXCAPTURES {
             return Err(Error::Parser(format!(
-                "pattern has too many captures (limit is {})",
-                LUA_MAXCAPTURES
+                "pattern has too many captures (limit is {LUA_MAXCAPTURES})"
             )));
         }
 
@@ -132,8 +129,7 @@ impl Parser {
             Token::Literal(b']') => Err(Error::Parser(
                 "malformed pattern (unexpected ']')".to_string(),
             )),
-            Token::Literal(b) => Ok(AstNode::Literal(b)),
-            Token::EscapedLiteral(b) => Ok(AstNode::Literal(b)),
+            Token::Literal(b) | Token::EscapedLiteral(b) => Ok(AstNode::Literal(b)),
             Token::Any => Ok(AstNode::Any),
             Token::Caret => Ok(AstNode::AnchorStart),
             Token::Dollar => Ok(AstNode::AnchorEnd),
@@ -246,7 +242,7 @@ impl Parser {
                 Some(_) => {
                     let token = self.tokens.next().unwrap(); // TODO: remove `unwrap`
                     let byte = token_to_byte(&token);
-                    set.add_byte(byte)
+                    set.add_byte(byte);
                 }
                 None => unreachable!(),
             }
@@ -272,8 +268,7 @@ impl Parser {
         let index = self.capture_count;
         if index > LUA_MAXCAPTURES {
             return Err(Error::Parser(format!(
-                "pattern has too many captures (limit is {})",
-                LUA_MAXCAPTURES
+                "pattern has too many captures (limit is {LUA_MAXCAPTURES})"
             )));
         }
 

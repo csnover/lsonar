@@ -1,14 +1,16 @@
 use lsonar::charset::CharSet;
-use lsonar::{AstNode, Error, Parser, Quantifier, Result, LUA_MAXCAPTURES};
+use lsonar::{AstNode, Error, LUA_MAXCAPTURES, Parser, Quantifier, Result};
 
 fn parse_ok(pattern: &[u8]) -> Vec<AstNode> {
     Parser::new(pattern)
         .expect("Parser::new failed")
         .parse()
-        .expect(&format!(
-            "Parser failed for pattern: {}",
-            str::from_utf8(pattern).unwrap()
-        ))
+        .unwrap_or_else(|_| {
+            panic!(
+                "Parser failed for pattern: {}",
+                str::from_utf8(pattern).unwrap()
+            )
+        })
 }
 
 fn parse_err(pattern: &[u8]) -> Result<Vec<AstNode>> {
@@ -150,11 +152,11 @@ fn test_sets_parser() {
     );
     assert_eq!(
         parse_ok(b"[abc]"),
-        vec![AstNode::Set(make_set(&[b'a', b'b', b'c'], &[], &[], false))]
+        vec![AstNode::Set(make_set(b"abc", &[], &[], false))]
     );
     assert_eq!(
         parse_ok(b"[^abc]"),
-        vec![AstNode::Set(make_set(&[b'a', b'b', b'c'], &[], &[], true))]
+        vec![AstNode::Set(make_set(b"abc", &[], &[], true))]
     );
     assert_eq!(
         parse_ok(b"[a-c]"),
@@ -166,38 +168,23 @@ fn test_sets_parser() {
     );
     assert_eq!(
         parse_ok(b"[a.^$]"),
-        vec![AstNode::Set(make_set(
-            &[b'a', b'.', b'^', b'$'],
-            &[],
-            &[],
-            false
-        ))]
+        vec![AstNode::Set(make_set(b"a.^$", &[], &[], false))]
     );
     assert_eq!(
         parse_ok(b"[%a]"),
-        vec![AstNode::Set(make_set(&[], &[], &[b'a'], false))]
+        vec![AstNode::Set(make_set(&[], &[], b"a", false))]
     );
     assert_eq!(
         parse_ok(b"[%%]"),
-        vec![AstNode::Set(make_set(&[b'%'], &[], &[], false))]
+        vec![AstNode::Set(make_set(b"%", &[], &[], false))]
     );
     assert_eq!(
         parse_ok(b"[-abc]"),
-        vec![AstNode::Set(make_set(
-            &[b'-', b'a', b'b', b'c'],
-            &[],
-            &[],
-            false
-        ))]
+        vec![AstNode::Set(make_set(b"-abc", &[], &[], false))]
     );
     assert_eq!(
         parse_ok(b"[abc-]"),
-        vec![AstNode::Set(make_set(
-            &[b'a', b'b', b'c', b'-'],
-            &[],
-            &[],
-            false
-        ))]
+        vec![AstNode::Set(make_set(b"abc-", &[], &[], false))]
     );
 }
 
@@ -206,7 +193,7 @@ fn test_set_quantifier_parser() {
     assert_eq!(
         parse_ok(b"[abc]*"),
         vec![quantified(
-            AstNode::Set(make_set(&[b'a', b'b', b'c'], &[], &[], false)),
+            AstNode::Set(make_set(b"abc", &[], &[], false)),
             Quantifier::Star
         )]
     );
@@ -283,7 +270,7 @@ fn test_balanced_frontier_parser() {
     assert_eq!(parse_ok(b"%b()"), vec![AstNode::Balanced(b'(', b')')]);
     assert_eq!(
         parse_ok(b"%f[ac]"),
-        vec![AstNode::Frontier(make_set(&[b'a', b'c'], &[], &[], false))]
+        vec![AstNode::Frontier(make_set(b"ac", &[], &[], false))]
     );
 }
 
@@ -348,7 +335,7 @@ fn test_throw_parser_errors() {
 
     let too_many_captures = "()".repeat(LUA_MAXCAPTURES + 1);
     assert!(
-        matches!(parse_err(&too_many_captures.as_bytes()), Err(Error::Parser(s)) if s.contains("too many captures"))
+        matches!(parse_err(too_many_captures.as_bytes()), Err(Error::Parser(s)) if s.contains("too many captures"))
     );
 }
 
@@ -356,19 +343,19 @@ fn test_throw_parser_errors() {
 fn test_special_byte_edge_cases_parser() {
     assert_eq!(
         parse_ok(b"[%%]"),
-        vec![AstNode::Set(make_set(&[b'%'], &[], &[], false))]
+        vec![AstNode::Set(make_set(b"%", &[], &[], false))]
     );
     assert_eq!(
         parse_ok(b"[%-]"),
-        vec![AstNode::Set(make_set(&[b'-'], &[], &[], false))]
+        vec![AstNode::Set(make_set(b"-", &[], &[], false))]
     );
     assert_eq!(
         parse_ok(b"[%]]"),
-        vec![AstNode::Set(make_set(&[b']'], &[], &[], false))]
+        vec![AstNode::Set(make_set(b"]", &[], &[], false))]
     );
     assert_eq!(
         parse_ok(b"[%[]"),
-        vec![AstNode::Set(make_set(&[b'['], &[], &[], false))]
+        vec![AstNode::Set(make_set(b"[", &[], &[], false))]
     );
 
     assert_eq!(
@@ -380,7 +367,7 @@ fn test_special_byte_edge_cases_parser() {
     );
     assert_eq!(
         parse_ok(b"[%[]"),
-        vec![AstNode::Set(make_set(&[b'['], &[], &[], false))]
+        vec![AstNode::Set(make_set(b"[", &[], &[], false))]
     );
 }
 
@@ -414,7 +401,7 @@ fn test_nested_complex_patterns_parser() {
         vec![AstNode::Capture {
             index: 1,
             inner: vec![
-                AstNode::Frontier(make_set(&[], &[], &[b'a'], false)),
+                AstNode::Frontier(make_set(&[], &[], b"a", false)),
                 quantified(AstNode::Class(b'w', false), Quantifier::Plus)
             ]
         }]
@@ -423,21 +410,21 @@ fn test_nested_complex_patterns_parser() {
 
 #[test]
 fn test_real_world_patterns_parser() {
-    assert!(parse_ok(b"https?://[%w%.%-%+]+%.%w+").len() > 0);
+    assert!(!parse_ok(b"https?://[%w%.%-%+]+%.%w+").is_empty());
 
-    assert!(parse_ok(b"^[%w%.%+%-]+@[%w%.%+%-]+%.%w+$").len() > 0);
+    assert!(!parse_ok(b"^[%w%.%+%-]+@[%w%.%+%-]+%.%w+$").is_empty());
 
-    assert!(parse_ok(b"(%d%d?)/(%d%d?)/(%d%d%d%d)").len() > 0);
+    assert!(!parse_ok(b"(%d%d?)/(%d%d?)/(%d%d%d%d)").is_empty());
 
-    assert!(parse_ok(b"(%d+)%.(%d+)%.(%d+)%.(%d+)").len() > 0);
+    assert!(!parse_ok(b"(%d+)%.(%d+)%.(%d+)%.(%d+)").is_empty());
 
-    assert!(parse_ok(b"\"([^\"]+)\":%s*\"([^\"]*)\"").len() > 0);
+    assert!(!parse_ok(b"\"([^\"]+)\":%s*\"([^\"]*)\"").is_empty());
 }
 
 #[test]
 fn test_special_lua_pattern_features_parser() {
-    assert!(parse_ok(b"%1").len() > 0);
-    assert!(parse_ok(b"(.)%1").len() > 0);
-    assert!(parse_ok(b"%b{}").len() > 0);
-    assert!(parse_ok(b"%f[%a]").len() > 0);
+    assert!(!parse_ok(b"%1").is_empty());
+    assert!(!parse_ok(b"(.)%1").is_empty());
+    assert!(!parse_ok(b"%b{}").is_empty());
+    assert!(!parse_ok(b"%f[%a]").is_empty());
 }

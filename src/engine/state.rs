@@ -2,12 +2,14 @@ use std::{ops::Range, rc::Rc};
 
 use crate::LUA_MAXCAPTURES;
 
+pub type Captures = Vec<Option<Range<usize>>>;
+
 #[derive(Clone)]
 pub struct State {
     pub input: Rc<[u8]>,
     pub current_pos: usize,
     pub search_start_pos: usize,
-    pub captures: Vec<Option<Range<usize>>>,
+    pub captures: Captures,
     pub recursion_depth: u32,
 }
 
