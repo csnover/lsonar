@@ -32,10 +32,10 @@ pub fn find_first_match(
             return Ok(Some((full_match_range, final_state.captures)));
         }
 
-        if let Some(AstNode::AnchorStart) = pattern_ast.first() {
-            if i == start_index {
-                break;
-            }
+        if let Some(AstNode::AnchorStart) = pattern_ast.first()
+            && i == start_index
+        {
+            break;
         }
         // TODO: What is missing here? This is a no-op
         // if pattern_ast.len() == 1 {
@@ -89,13 +89,11 @@ fn match_recursive(ast: &[AstNode], mut state: State) -> Option<State> {
             }
         }
         AstNode::Set(charset) => {
-            if let Some(b) = state.current_byte() {
-                if charset.contains(b) {
-                    state.current_pos += 1;
-                    match_recursive(remaining_ast, state)
-                } else {
-                    None
-                }
+            if let Some(b) = state.current_byte()
+                && charset.contains(b)
+            {
+                state.current_pos += 1;
+                match_recursive(remaining_ast, state)
             } else {
                 None
             }
@@ -174,12 +172,11 @@ fn match_recursive(ast: &[AstNode], mut state: State) -> Option<State> {
                 Quantifier::Question => {
                     // Greedy ? (0 or 1)
                     let item_ast = std::slice::from_ref(item.as_ref());
-                    if let Some(state_after_1) = match_recursive(item_ast, state.clone()) {
-                        if let Some(final_state) =
+                    if let Some(state_after_1) = match_recursive(item_ast, state.clone())
+                        && let Some(final_state) =
                             match_recursive(remaining_ast, state_after_1.clone())
-                        {
-                            return Some(final_state.clone());
-                        }
+                    {
+                        return Some(final_state.clone());
                     }
                     match_recursive(remaining_ast, state)
                 }
@@ -202,10 +199,8 @@ fn match_greedy_quantifier(
 
     for _ in 0..min_matches {
         if let Some(next_state) = match_recursive(std::slice::from_ref(item), current_state.clone())
+            && next_state.current_pos != current_state.current_pos
         {
-            if next_state.current_pos == current_state.current_pos {
-                return None;
-            }
             current_state = next_state;
         } else {
             return None;
