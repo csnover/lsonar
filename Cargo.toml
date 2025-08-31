@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["reloginn <nikita.malina23@gmail.com>"]
 description = "Lua 5.3 pattern engine, fully compatible with the original Lua 5.3 engine"
 license = "MIT"
+repository = "https://github.com/reloginn/lsonar"
 
 [dependencies]
 
