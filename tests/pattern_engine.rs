@@ -1,31 +1,24 @@
-use lsonar::{
-    LUA_MAXCAPTURES, Parser, Result,
-    engine::{Captures, find_first_match},
-};
+use lsonar::{Parser, Result, engine::find_first_match};
 use std::ops::Range;
 
-fn find(pattern_str: &[u8], text: &[u8]) -> Result<Option<(Range<usize>, Captures)>> {
+fn find(pattern_str: &[u8], text: &[u8]) -> Result<Option<(Range<usize>, Vec<Range<usize>>)>> {
     let mut parser = Parser::new(pattern_str)?;
     let ast = parser.parse()?;
-    find_first_match(&ast, text, 0) // 0-based index only for tests
+    Ok(find_first_match(&ast, text, 0)) // 0-based index only for tests
 }
 
+#[track_caller]
 fn assert_match(
     pattern: &[u8],
     text: &[u8],
     expected_full: Range<usize>,
-    expected_captures: &[Option<Range<usize>>],
+    expected_captures: &[Range<usize>],
 ) {
     let result = find(pattern, text).expect("find failed");
     match result {
         Some((full_match, captures)) => {
             assert_eq!(full_match, expected_full, "Full match range mismatch");
-            let num_expected = expected_captures.len();
-            assert_eq!(
-                &captures[..num_expected],
-                expected_captures,
-                "Captures mismatch"
-            );
+            assert_eq!(&captures[..], expected_captures, "Captures mismatch");
         }
         None => panic!(
             "Expected match, but found none for pattern '{}' in text '{}'",
@@ -35,6 +28,7 @@ fn assert_match(
     }
 }
 
+#[track_caller]
 fn assert_no_match(pattern: &[u8], text: &[u8]) {
     let result = find(pattern, text).expect("find failed");
     assert!(
@@ -142,33 +136,33 @@ fn test_non_greedy_quantifier_engine() {
 
 #[test]
 fn test_captures_simple_engine() {
-    assert_match(b"(a)", b"a", 0..1, &[Some(0..1)]);
-    assert_match(b"(.)", b"b", 0..1, &[Some(0..1)]);
-    assert_match(b"(%d)", b"3", 0..1, &[Some(0..1)]);
-    assert_match(b"a(b)c", b"abc", 0..3, &[Some(1..2)]);
-    assert_match(b"a(.)c", b"axc", 0..3, &[Some(1..2)]);
-    assert_match(b"(a)(b)", b"ab", 0..2, &[Some(0..1), Some(1..2)]);
-    assert_match(b"()(b)", b"b", 0..1, &[Some(0..0), Some(0..1)]);
+    assert_match(b"(a)", b"a", 0..1, &[(0..1)]);
+    assert_match(b"(.)", b"b", 0..1, &[(0..1)]);
+    assert_match(b"(%d)", b"3", 0..1, &[(0..1)]);
+    assert_match(b"a(b)c", b"abc", 0..3, &[(1..2)]);
+    assert_match(b"a(.)c", b"axc", 0..3, &[(1..2)]);
+    assert_match(b"(a)(b)", b"ab", 0..2, &[(0..1), (1..2)]);
+    assert_match(b"()(b)", b"b", 0..1, &[(0..0), (0..1)]);
 }
 
 #[test]
 fn test_captures_quantified_engine() {
-    assert_match(b"(a)*", b"aaa", 0..3, &[Some(2..3)]);
-    assert_match(b"(a)+", b"aaa", 0..3, &[Some(2..3)]);
-    assert_match(b"(a)?", b"a", 0..1, &[Some(0..1)]);
-    assert_match(b"(a)?", b"", 0..0, &[None]);
-    assert_match(b"a(b)*c", b"abbbc", 0..5, &[Some(3..4)]);
-    assert_match(b"a(b)+c", b"abbbc", 0..5, &[Some(3..4)]);
-    assert_match(b"a(b)?c", b"abc", 0..3, &[Some(1..2)]);
-    assert_match(b"a(b)?c", b"ac", 0..2, &[None]);
-    assert_match(b"a(b)-c", b"abbbc", 0..5, &[Some(3..4)]);
-    assert_match(b"a(b)-c", b"abbbc", 0..5, &[Some(3..4)]);
+    assert_match(b"(a)*", b"aaa", 0..3, &[(2..3)]);
+    assert_match(b"(a)+", b"aaa", 0..3, &[(2..3)]);
+    assert_match(b"(a)?", b"a", 0..1, &[(0..1)]);
+    assert_match(b"(a)?", b"", 0..0, &[<_>::default()]);
+    assert_match(b"a(b)*c", b"abbbc", 0..5, &[(3..4)]);
+    assert_match(b"a(b)+c", b"abbbc", 0..5, &[(3..4)]);
+    assert_match(b"a(b)?c", b"abc", 0..3, &[(1..2)]);
+    assert_match(b"a(b)?c", b"ac", 0..2, &[<_>::default()]);
+    assert_match(b"a(b)-c", b"abbbc", 0..5, &[(3..4)]);
+    assert_match(b"a(b)-c", b"abbbc", 0..5, &[(3..4)]);
 }
 
 #[test]
 fn test_captures_nested_engine() {
-    assert_match(b"(a(b)c)", b"abc", 0..3, &[Some(0..3), Some(1..2)]);
-    assert_match(b"((.)%w*)", b"a1 b2", 0..2, &[Some(0..2), Some(0..1)]);
+    assert_match(b"(a(b)c)", b"abc", 0..3, &[(0..3), (1..2)]);
+    assert_match(b"((.)%w*)", b"a1 b2", 0..2, &[(0..2), (0..1)]);
 }
 
 #[test]
@@ -198,9 +192,9 @@ fn test_frontier_engine() {
 fn test_backtracking_engine() {
     assert_no_match(b"a*b", b"aaac");
     assert_no_match(b"a+b", b"aaac");
-    assert_match(b"(ab)+a", b"abab", 0..3, &[]);
-    assert_match(b"(a*)b", b"aaab", 0..4, &[Some(0..3)]);
-    assert_match(b"(a+)b", b"aaab", 0..4, &[Some(0..3)]);
+    assert_match(b"(ab)+a", b"abab", 0..3, &[0..2]);
+    assert_match(b"(a*)b", b"aaab", 0..4, &[(0..3)]);
+    assert_match(b"(a+)b", b"aaab", 0..4, &[(0..3)]);
     assert_match(b"a[bc]+d", b"abbcd", 0..5, &[]);
 }
 
@@ -212,7 +206,7 @@ fn test_empty_engine() {
     assert_match(b"a*", b"", 0..0, &[]);
     assert_no_match(b"a+", b"");
     assert_match(b"a?", b"", 0..0, &[]);
-    assert_match(b"()", b"", 0..0, &[Some(0..0)]);
+    assert_match(b"()", b"", 0..0, &[(0..0)]);
 }
 
 #[test]
@@ -222,10 +216,9 @@ fn test_find_offset_engine() {
     let mut parser = Parser::new(pattern).unwrap();
     let ast = parser.parse().unwrap();
     let result = find_first_match(&ast, text, 1).unwrap();
-    assert_eq!(result, Some((1..2, vec![None; LUA_MAXCAPTURES])));
+    assert_eq!(result, ((1..2, vec![])));
 
-    let result2 = find_first_match(&ast, text, 2).unwrap();
-    assert!(result2.is_none());
+    assert!(find_first_match(&ast, text, 2).is_none());
 }
 
 #[test]
@@ -255,9 +248,9 @@ fn test_extracting_data_with_captures_engine() {
         .unwrap();
     let (full, captures) = result;
     assert_eq!(full, 6..16);
-    assert_eq!(captures[0], Some(6..8));
-    assert_eq!(captures[1], Some(9..11));
-    assert_eq!(captures[2], Some(12..16));
+    assert_eq!(captures[0], (6..8));
+    assert_eq!(captures[1], (9..11));
+    assert_eq!(captures[2], (12..16));
 
     let result = find(
         b"([%w%.%+%-]+)@([%w%.%+%-]+%.%w+)",
@@ -267,8 +260,8 @@ fn test_extracting_data_with_captures_engine() {
     .unwrap();
     let (full, captures) = result;
     assert_eq!(full, 9..29);
-    assert_eq!(captures[0], Some(9..17));
-    assert_eq!(captures[1], Some(18..29));
+    assert_eq!(captures[0], (9..17));
+    assert_eq!(captures[1], (18..29));
 }
 
 #[test]
@@ -295,8 +288,8 @@ fn test_complex_pattern_combinations_engine() {
     let result = find(pattern, text).unwrap().unwrap();
     let (full, captures) = result;
     assert_eq!(full, 9..68);
-    assert_eq!(captures[0], Some(18..37));
-    assert_eq!(captures[1], Some(52..64));
+    assert_eq!(captures[0], (18..37));
+    assert_eq!(captures[1], (52..64));
 
     assert_match(
         b"%f[%w][%u][%l]+%f[^%w]",
@@ -309,9 +302,9 @@ fn test_complex_pattern_combinations_engine() {
         .unwrap()
         .unwrap();
     let (_, captures) = result;
-    assert_eq!(captures[0], Some(0..5));
-    assert_eq!(captures[1], Some(6..12));
-    assert_eq!(captures[2], Some(13..19));
+    assert_eq!(captures[0], (0..5));
+    assert_eq!(captures[1], (6..12));
+    assert_eq!(captures[2], (13..19));
 }
 
 #[test]
@@ -319,14 +312,14 @@ fn test_optimization_cases_engine() {
     let mut parser = Parser::new(b"^abc").unwrap();
     let ast = parser.parse().unwrap();
 
-    assert!(find_first_match(&ast, b"abcdef", 0).unwrap().is_some());
-    assert!(find_first_match(&ast, b"abcdef", 1).unwrap().is_none());
+    assert!(find_first_match(&ast, b"abcdef", 0).is_some());
+    assert!(find_first_match(&ast, b"abcdef", 1).is_none());
 
     let mut parser = Parser::new(b"abc$").unwrap();
     let ast = parser.parse().unwrap();
 
-    assert!(find_first_match(&ast, b"xyzabc", 0).unwrap().is_some());
-    assert!(find_first_match(&ast, b"abcxyz", 0).unwrap().is_none());
+    assert!(find_first_match(&ast, b"xyzabc", 0).is_some());
+    assert!(find_first_match(&ast, b"abcxyz", 0).is_none());
 }
 
 #[test]
@@ -341,24 +334,24 @@ fn test_pattern_with_utf8_content_engine() {
 
 #[test]
 fn test_quantifiers_with_capturing_groups_engine() {
-    assert_match(b"(a)+", b"aaa", 0..3, &[Some(2..3)]);
-    assert_match(b"(ab)+", b"ababab", 0..6, &[Some(4..6)]);
-    assert_match(b"(a)*", b"aaa", 0..3, &[Some(2..3)]);
-    assert_match(b"(a)*", b"", 0..0, &[None]);
-    assert_match(b"(a)?", b"a", 0..1, &[Some(0..1)]);
-    assert_match(b"(a)?", b"", 0..0, &[None]);
-    assert_match(b"(a)-", b"aaa", 0..0, &[None]);
+    assert_match(b"(a)+", b"aaa", 0..3, &[(2..3)]);
+    assert_match(b"(ab)+", b"ababab", 0..6, &[(4..6)]);
+    assert_match(b"(a)*", b"aaa", 0..3, &[(2..3)]);
+    assert_match(b"(a)*", b"", 0..0, &[(0..0)]);
+    assert_match(b"(a)?", b"a", 0..1, &[(0..1)]);
+    assert_match(b"(a)?", b"", 0..0, &[(0..0)]);
+    assert_match(b"(a)-", b"aaa", 0..0, &[(0..0)]);
 }
 
 #[test]
 fn test_edge_cases_and_backtracking_engine() {
-    assert_match(b"(a+)+", b"aaa", 0..3, &[Some(0..3)]);
+    assert_match(b"(a+)+", b"aaa", 0..3, &[(0..3)]);
     assert_match(b"[ab][cd]", b"ac", 0..2, &[]);
     assert_match(b"[ab][cd]", b"bd", 0..2, &[]);
     assert_no_match(b"[ab][cd]", b"ab");
     assert_match(b"a.-b", b"axxxbyyybzzz", 0..5, &[]);
     assert_match(b"a.*b", b"axxxbyyybzzz", 0..9, &[]);
-    assert_match(b"(a*)(b?)b+", b"aaabbb", 0..6, &[Some(0..3), Some(3..4)]);
+    assert_match(b"(a*)(b?)b+", b"aaabbb", 0..6, &[(0..3), (3..4)]);
 }
 
 #[test]
@@ -369,9 +362,9 @@ fn test_real_world_patterns_advanced_engine() {
     let result = find(pattern, html).unwrap().unwrap();
     let (full, captures) = result;
     assert_eq!(full, 0..52);
-    assert_eq!(captures[0], Some(12..16));
-    assert_eq!(captures[1], Some(18..40));
-    assert_eq!(captures[2], Some(40..46));
+    assert_eq!(captures[0], (12..16));
+    assert_eq!(captures[1], (18..40));
+    assert_eq!(captures[2], (40..46));
 
     let log_line = b"2023-04-15 14:23:45 ERROR [app.service] Failed to connect: timeout";
     let pattern = b"(%d+)%-(%d+)%-(%d+) (%d+):(%d+):(%d+) (%u+)";
@@ -379,13 +372,13 @@ fn test_real_world_patterns_advanced_engine() {
     let result = find(pattern, log_line).unwrap().unwrap();
     let (full, captures) = result;
     assert_eq!(full, 0..25);
-    assert_eq!(captures[0], Some(0..4));
-    assert_eq!(captures[1], Some(5..7));
-    assert_eq!(captures[2], Some(8..10));
-    assert_eq!(captures[3], Some(11..13));
-    assert_eq!(captures[4], Some(14..16));
-    assert_eq!(captures[5], Some(17..19));
-    assert_eq!(captures[6], Some(20..25));
+    assert_eq!(captures[0], (0..4));
+    assert_eq!(captures[1], (5..7));
+    assert_eq!(captures[2], (8..10));
+    assert_eq!(captures[3], (11..13));
+    assert_eq!(captures[4], (14..16));
+    assert_eq!(captures[5], (17..19));
+    assert_eq!(captures[6], (20..25));
 }
 
 #[test]
@@ -394,13 +387,13 @@ fn test_subsequent_captures_engine() {
         b"(%d%d%d%d)%-(%d%d)%-(%d%d)",
         b"2023-04-15",
         0..10,
-        &[Some(0..4), Some(5..7), Some(8..10)],
+        &[(0..4), (5..7), (8..10)],
     );
 
     assert_match(
         b"(%d+)_(%w+)_(%d+)",
         b"123_test_456",
         0..12,
-        &[Some(0..3), Some(4..8), Some(9..12)],
+        &[(0..3), (4..8), (9..12)],
     );
 }

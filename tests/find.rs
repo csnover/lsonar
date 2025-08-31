@@ -66,7 +66,7 @@ fn test_balanced_patterns() {
 
     assert_eq!(
         find(b"a(b(c)d)e", b"(%b())", None, false),
-        Ok(Some((2, 8, vec![b"(b(c)d)".to_vec()])))
+        Ok(Some((2, 8, vec![b"(b(c)d)".as_slice()])))
     );
 }
 
@@ -137,19 +137,15 @@ fn test_find_with_init() {
 fn test_find_pattern_with_captures() {
     assert_eq!(
         find(b"hello 123 world", b"(%d+)", None, false),
-        Ok(Some((7, 9, vec![b"123".to_vec()])))
+        Ok(Some((7, 9, vec![b"123".as_slice()])))
     );
     assert_eq!(
         find(b"name=John age=25", b"(%w+)=(%w+)", None, false),
-        Ok(Some((1, 9, vec![b"name".to_vec(), b"John".to_vec()])))
+        Ok(Some((1, 9, vec![b"name".as_slice(), b"John"])))
     );
     assert_eq!(
         find(b"2023-04-15", b"(%d%d%d%d)%-(%d%d)%-(%d%d)", None, false),
-        Ok(Some((
-            1,
-            10,
-            vec![b"2023".to_vec(), b"04".to_vec(), b"15".to_vec()]
-        )))
+        Ok(Some((1, 10, vec![b"2023".as_slice(), b"04", b"15"])))
     );
 }
 

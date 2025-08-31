@@ -1,27 +1,25 @@
-use std::{ops::Range, rc::Rc};
+use std::ops::Range;
 
 use crate::LUA_MAXCAPTURES;
 
-pub type Captures = Vec<Option<Range<usize>>>;
-
 #[derive(Clone)]
-pub struct State {
-    pub input: Rc<[u8]>,
+pub struct State<'a> {
+    pub input: &'a [u8],
     pub current_pos: usize,
     pub search_start_pos: usize,
-    pub captures: Captures,
+    pub captures: [Range<usize>; LUA_MAXCAPTURES],
     pub recursion_depth: u32,
 }
 
 pub const MAX_RECURSION_DEPTH: u32 = 500;
 
-impl State {
-    pub fn new(input_slice: &[u8], start_pos: usize) -> Self {
-        State {
-            input: Rc::from(input_slice),
+impl<'a> State<'a> {
+    pub fn new(input_slice: &'a [u8], start_pos: usize) -> Self {
+        Self {
+            input: input_slice,
             current_pos: start_pos,
             search_start_pos: start_pos,
-            captures: vec![None; LUA_MAXCAPTURES],
+            captures: <_>::default(),
             recursion_depth: 0,
         }
     }

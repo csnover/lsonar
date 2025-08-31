@@ -10,6 +10,8 @@ pub use self::{
     r#match::r#match,
 };
 
+pub type Captures<'a> = Vec<&'a [u8]>;
+
 fn calculate_start_index(text_len: usize, init: Option<isize>) -> usize {
     match init {
         Some(i) if i > 0 => {

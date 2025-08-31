@@ -1,39 +1,35 @@
 use lsonar::r#match;
 
-fn convert_to_string_vec(items: &[&[u8]]) -> Vec<Vec<u8>> {
-    items.iter().map(|&s| s.to_vec()).collect()
-}
-
 #[test]
 fn test_simple_match() {
     assert_eq!(
         r#match(b"hello world", b"hello", None),
-        Ok(Some(vec![b"hello".to_vec()]))
+        Ok(vec![b"hello".as_slice()])
     );
     assert_eq!(
         r#match(b"hello world", b"world", None),
-        Ok(Some(vec![b"world".to_vec()]))
+        Ok(vec![b"world".as_slice()])
     );
-    assert_eq!(r#match(b"hello world", b"bye", None), Ok(None));
+    assert_eq!(r#match(b"hello world", b"bye", None), Ok(vec![]));
 }
 
 #[test]
 fn test_pattern_classes() {
     assert_eq!(
         r#match(b"abc123", b"%a+", None),
-        Ok(Some(convert_to_string_vec(&[b"abc"])))
+        Ok(vec![b"abc".as_slice()])
     );
     assert_eq!(
         r#match(b"abc123", b"%d+", None),
-        Ok(Some(convert_to_string_vec(&[b"123"])))
+        Ok(vec![b"123".as_slice()])
     );
     assert_eq!(
         r#match(b"abc123", b"[%D]+", None),
-        Ok(Some(convert_to_string_vec(&[b"abc"])))
+        Ok(vec![b"abc".as_slice()])
     );
     assert_eq!(
         r#match(b"abc123", b"[%A]+", None),
-        Ok(Some(convert_to_string_vec(&[b"123"])))
+        Ok(vec![b"123".as_slice()])
     );
 }
 
@@ -41,7 +37,7 @@ fn test_pattern_classes() {
 fn test_single_capture() {
     assert_eq!(
         r#match(b"hello world", b"(hello)", None),
-        Ok(Some(convert_to_string_vec(&[b"hello"])))
+        Ok(vec![b"hello".as_slice()])
     );
 }
 
@@ -49,11 +45,11 @@ fn test_single_capture() {
 fn test_multiple_captures() {
     assert_eq!(
         r#match(b"hello world", b"(hello) (world)", None),
-        Ok(Some(convert_to_string_vec(&[b"hello", b"world"])))
+        Ok(vec![b"hello".as_slice(), b"world"])
     );
     assert_eq!(
         r#match(b"123-456-7890", b"(%d+)%-(%d+)%-(%d+)", None),
-        Ok(Some(convert_to_string_vec(&[b"123", b"456", b"7890"])))
+        Ok(vec![b"123".as_slice(), b"456", b"7890"])
     );
 }
 
@@ -61,7 +57,7 @@ fn test_multiple_captures() {
 fn test_combined_pattern_captures() {
     assert_eq!(
         r#match(b"abc123", b"(%a+)(%d+)", None),
-        Ok(Some(convert_to_string_vec(&[b"abc", b"123"])))
+        Ok(vec![b"abc".as_slice(), b"123"])
     );
 }
 
@@ -69,7 +65,7 @@ fn test_combined_pattern_captures() {
 fn test_empty_captures() {
     assert_eq!(
         r#match(b"hello", b"(h)()ello", None),
-        Ok(Some(convert_to_string_vec(&[b"h", b""])))
+        Ok(vec![b"h".as_slice(), b""])
     );
 }
 
@@ -77,39 +73,27 @@ fn test_empty_captures() {
 fn test_init_parameter() {
     assert_eq!(
         r#match(b"hello world", b"world", Some(6)),
-        Ok(Some(convert_to_string_vec(&[b"world"])))
+        Ok(vec![b"world".as_slice()])
     );
     assert_eq!(
         r#match(b"hello world", b"hello", Some(1)),
-        Ok(Some(convert_to_string_vec(&[b"hello"])))
+        Ok(vec![b"hello".as_slice()])
     );
-    assert_eq!(r#match(b"hello world", b"hello", Some(2)), Ok(None));
+    assert_eq!(r#match(b"hello world", b"hello", Some(2)), Ok(vec![]));
 }
 
 #[test]
 fn test_empty_string_edge_cases() {
-    assert_eq!(
-        r#match(b"", b"", None),
-        Ok(Some(convert_to_string_vec(&[b""])))
-    );
-    assert_eq!(
-        r#match(b"", b"^$", None),
-        Ok(Some(convert_to_string_vec(&[b""])))
-    );
+    assert_eq!(r#match(b"", b"", None), Ok(vec![b"".as_slice()]));
+    assert_eq!(r#match(b"", b"^$", None), Ok(vec![b"".as_slice()]));
 }
 
 #[test]
 fn test_anchor_patterns() {
-    assert_eq!(
-        r#match(b"hello", b"^", None),
-        Ok(Some(convert_to_string_vec(&[b""])))
-    );
-    assert_eq!(
-        r#match(b"hello", b"$", None),
-        Ok(Some(convert_to_string_vec(&[b""])))
-    );
+    assert_eq!(r#match(b"hello", b"^", None), Ok(vec![b"".as_slice()]));
+    assert_eq!(r#match(b"hello", b"$", None), Ok(vec![b"".as_slice()]));
     assert_eq!(
         r#match(b"hello", b"^hello$", None),
-        Ok(Some(convert_to_string_vec(&[b"hello"])))
+        Ok(vec![b"hello".as_slice()])
     );
 }

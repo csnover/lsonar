@@ -1,10 +1,10 @@
 use super::{
     super::{Parser, Result, engine::find_first_match},
-    calculate_start_index,
+    Captures, calculate_start_index,
 };
 
 /// Corresponds to Lua 5.3 `string.match`
-pub fn r#match(text: &[u8], pattern: &[u8], init: Option<isize>) -> Result<Option<Vec<Vec<u8>>>> {
+pub fn r#match<'a>(text: &'a [u8], pattern: &[u8], init: Option<isize>) -> Result<Captures<'a>> {
     let byte_len = text.len();
 
     let start_byte_index = calculate_start_index(byte_len, init);
@@ -12,20 +12,18 @@ pub fn r#match(text: &[u8], pattern: &[u8], init: Option<isize>) -> Result<Optio
     let mut parser = Parser::new(pattern)?;
     let ast = parser.parse()?;
 
-    match find_first_match(&ast, text, start_byte_index)? {
+    Ok(match find_first_match(&ast, text, start_byte_index) {
         Some((match_byte_range, captures_byte_ranges)) => {
-            let captures: Vec<_> = captures_byte_ranges
-                .into_iter()
-                .filter_map(|maybe_range| maybe_range.map(|range| text[range].to_owned()))
-                .collect();
+            let captures = captures_byte_ranges;
+            let has_captures = !captures.is_empty();
 
-            if captures.is_empty() {
-                let full_match = text[match_byte_range.start..match_byte_range.end].to_owned();
-                Ok(Some(vec![full_match]))
+            if has_captures {
+                captures.into_iter().map(|range| &text[range]).collect()
             } else {
-                Ok(Some(captures))
+                let full_match = &text[match_byte_range];
+                vec![full_match]
             }
         }
-        None => Ok(None),
-    }
+        None => vec![],
+    })
 }

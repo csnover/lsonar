@@ -1,10 +1,7 @@
 use std::ops::Range;
 
-use super::{
-    Result,
-    ast::{AstNode, Quantifier},
-};
-pub use state::Captures;
+use super::ast::{AstNode, Quantifier};
+use crate::ast::AstRoot;
 use state::{MAX_RECURSION_DEPTH, State};
 
 mod state;
@@ -12,11 +9,12 @@ mod state;
 /// Tries to find the first match of the pattern in the input string,
 /// starting the search at `start_index` (0-based).
 /// Returns the range of the full match and the ranges of captures if successful.
+#[must_use]
 pub fn find_first_match(
-    pattern_ast: &[AstNode],
+    pattern_ast: &AstRoot,
     input: &[u8],
     start_index: usize,
-) -> Result<Option<(Range<usize>, Captures)>> {
+) -> Option<(Range<usize>, Vec<Range<usize>>)> {
     let input_len = input.len();
 
     if start_index > input_len {
@@ -29,7 +27,10 @@ pub fn find_first_match(
 
         if let Some(final_state) = match_recursive(pattern_ast, initial_state) {
             let full_match_range = i..final_state.current_pos;
-            return Ok(Some((full_match_range, final_state.captures)));
+            return Some((
+                full_match_range,
+                final_state.captures[..pattern_ast.capture_count()].to_vec(),
+            ));
         }
 
         if let Some(AstNode::AnchorStart) = pattern_ast.first()
@@ -47,10 +48,10 @@ pub fn find_first_match(
         // }
     }
 
-    Ok(None)
+    None
 }
 
-fn match_recursive(ast: &[AstNode], mut state: State) -> Option<State> {
+fn match_recursive<'a>(ast: &[AstNode], mut state: State<'a>) -> Option<State<'a>> {
     if state.recursion_depth > MAX_RECURSION_DEPTH {
         return None;
     }
@@ -118,7 +119,7 @@ fn match_recursive(ast: &[AstNode], mut state: State) -> Option<State> {
 
             if let Some(mut success_state) = match_recursive(inner, state.clone()) {
                 let capture_range = start_pos..success_state.current_pos;
-                success_state.captures[capture_index] = Some(capture_range.clone());
+                success_state.captures[capture_index] = capture_range;
 
                 if let Some(final_state) = match_recursive(remaining_ast, success_state) {
                     return Some(final_state);
@@ -188,12 +189,12 @@ fn match_recursive(ast: &[AstNode], mut state: State) -> Option<State> {
     }
 }
 
-fn match_greedy_quantifier(
+fn match_greedy_quantifier<'a>(
     item: &AstNode,
     remaining_ast: &[AstNode],
-    initial_state: State,
+    initial_state: State<'a>,
     min_matches: usize,
-) -> Option<State> {
+) -> Option<State<'a>> {
     let mut current_state = initial_state;
     let mut successful_match_states = Vec::new();
 
@@ -227,11 +228,11 @@ fn match_greedy_quantifier(
     None
 }
 
-fn match_non_greedy_quantifier(
+fn match_non_greedy_quantifier<'a>(
     item: &AstNode,
     remaining_ast: &[AstNode],
-    initial_state: State,
-) -> Option<State> {
+    initial_state: State<'a>,
+) -> Option<State<'a>> {
     let mut current_state = initial_state;
 
     loop {

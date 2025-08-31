@@ -23,19 +23,15 @@ pub fn gsub<'a>(
     let max_replacements = n.unwrap_or(usize::MAX);
 
     while replacements < max_replacements {
-        match find_first_match(&pattern_ast, text, last_pos)? {
+        match find_first_match(&pattern_ast, text, last_pos) {
             Some((match_range, captures)) => {
                 result.extend(&text[last_pos..match_range.start]);
 
-                let full_match = &text[match_range.start..match_range.end];
-                let captures_str: Vec<&[u8]> = captures
-                    .iter()
-                    .filter_map(|maybe_range| {
-                        maybe_range
-                            .as_ref()
-                            .map(|range| &text[range.start..range.end])
-                    })
-                    .collect();
+                let full_match = &text[match_range.clone()];
+                let captures_str = captures
+                    .into_iter()
+                    .map(|range| &text[range])
+                    .collect::<Vec<_>>();
 
                 match repl {
                     Repl::String(repl_str) => {
@@ -67,7 +63,7 @@ pub fn gsub<'a>(
                 last_pos = match_range.end;
                 replacements += 1;
 
-                if match_range.start == match_range.end {
+                if match_range.is_empty() {
                     if last_pos >= byte_len {
                         break;
                     }

@@ -1,6 +1,6 @@
 use super::{
     Error, LUA_MAXCAPTURES, Result,
-    ast::{AstNode, Quantifier},
+    ast::{AstNode, AstRoot, Quantifier},
     charset::CharSet,
     lexer::{Lexer, Token},
 };
@@ -50,7 +50,7 @@ impl Parser {
         })
     }
 
-    pub fn parse(&mut self) -> Result<Vec<AstNode>> {
+    pub fn parse(&mut self) -> Result<AstRoot> {
         let ast = self.parse_sequence(None)?;
 
         if let Some(token) = self.tokens.peek() {
@@ -65,7 +65,7 @@ impl Parser {
             )));
         }
 
-        Ok(ast)
+        Ok(AstRoot::new(ast, self.capture_count))
     }
 
     fn parse_sequence(&mut self, end_token: Option<&Token>) -> Result<Vec<AstNode>> {

@@ -1,14 +1,14 @@
-use crate::{AstNode, Result, engine::find_first_match};
+use crate::{AstRoot, engine::find_first_match, lua::Captures};
 
-pub struct GMatchIterator {
-    pub(super) bytes: Vec<u8>,
-    pub(super) pattern_ast: Vec<AstNode>,
+pub struct GMatchIterator<'a> {
+    pub(super) bytes: &'a [u8],
+    pub(super) pattern_ast: AstRoot,
     pub(super) current_pos: usize,
     pub(super) is_empty_pattern: bool,
 }
 
-impl Iterator for GMatchIterator {
-    type Item = Result<Vec<Vec<u8>>>;
+impl<'a> Iterator for GMatchIterator<'a> {
+    type Item = Captures<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.current_pos > self.bytes.len() {
@@ -16,15 +16,13 @@ impl Iterator for GMatchIterator {
         }
 
         if self.is_empty_pattern {
-            let result = Some(Ok(vec![vec![]]));
-
+            let result = Some(vec![&self.bytes[self.current_pos..self.current_pos]]);
             self.current_pos += 1;
-
             return result;
         }
 
-        match find_first_match(&self.pattern_ast, &self.bytes, self.current_pos) {
-            Ok(Some((match_range, captures))) => {
+        find_first_match(&self.pattern_ast, self.bytes, self.current_pos).and_then(
+            |(match_range, captures)| {
                 if match_range.start == match_range.end {
                     self.current_pos = match_range.end + 1;
                     if self.current_pos > self.bytes.len() {
@@ -34,21 +32,15 @@ impl Iterator for GMatchIterator {
                     self.current_pos = match_range.end;
                 }
 
-                let result: Vec<Vec<u8>> = if captures.iter().any(Option::is_some) {
+                Some(if captures.is_empty() {
+                    vec![&self.bytes[match_range]]
+                } else {
                     captures
                         .into_iter()
-                        .filter_map(|maybe_range| {
-                            maybe_range.map(|range| self.bytes[range].to_owned())
-                        })
+                        .map(|range| &self.bytes[range])
                         .collect()
-                } else {
-                    vec![self.bytes[match_range.start..match_range.end].to_owned()]
-                };
-
-                Some(Ok(result))
-            }
-            Ok(None) => None,
-            Err(e) => Some(Err(e)),
-        }
+                })
+            },
+        )
     }
 }

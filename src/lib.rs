@@ -9,7 +9,7 @@ pub mod lua;
 pub mod parser;
 
 pub use self::{
-    ast::{AstNode, Quantifier},
+    ast::{AstNode, AstRoot, Quantifier},
     charset::CharSet,
     lexer::{Lexer, Token},
     lua::{Repl, find, gmatch, gsub, r#match},

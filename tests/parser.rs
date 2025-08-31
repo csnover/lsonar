@@ -1,7 +1,7 @@
 use lsonar::charset::CharSet;
-use lsonar::{AstNode, Error, LUA_MAXCAPTURES, Parser, Quantifier, Result};
+use lsonar::{AstNode, AstRoot, Error, LUA_MAXCAPTURES, Parser, Quantifier, Result};
 
-fn parse_ok(pattern: &[u8]) -> Vec<AstNode> {
+fn parse_ok(pattern: &[u8]) -> AstRoot {
     Parser::new(pattern)
         .expect("Parser::new failed")
         .parse()
@@ -13,7 +13,7 @@ fn parse_ok(pattern: &[u8]) -> Vec<AstNode> {
         })
 }
 
-fn parse_err(pattern: &[u8]) -> Result<Vec<AstNode>> {
+fn parse_err(pattern: &[u8]) -> Result<AstRoot> {
     let mut parser = Parser::new(pattern)?;
     parser.parse()
 }
@@ -46,7 +46,7 @@ fn make_set(bytes: &[u8], ranges: &[(u8, u8)], classes: &[u8], negated: bool) ->
 fn test_simple_sequence_parser() {
     assert_eq!(
         parse_ok(b"abc"),
-        vec![
+        &[
             AstNode::Literal(b'a'),
             AstNode::Literal(b'b'),
             AstNode::Literal(b'c')
@@ -54,11 +54,11 @@ fn test_simple_sequence_parser() {
     );
     assert_eq!(
         parse_ok(b"a.c"),
-        vec![AstNode::Literal(b'a'), AstNode::Any, AstNode::Literal(b'c')]
+        &[AstNode::Literal(b'a'), AstNode::Any, AstNode::Literal(b'c')]
     );
     assert_eq!(
         parse_ok(b"a%dc"),
-        vec![
+        &[
             AstNode::Literal(b'a'),
             AstNode::Class(b'd', false),
             AstNode::Literal(b'c')
@@ -66,7 +66,7 @@ fn test_simple_sequence_parser() {
     );
     assert_eq!(
         parse_ok(b"a%Dc"),
-        vec![
+        &[
             AstNode::Literal(b'a'),
             AstNode::Class(b'd', true),
             AstNode::Literal(b'c')
@@ -78,7 +78,7 @@ fn test_simple_sequence_parser() {
 fn test_anchors_parser() {
     assert_eq!(
         parse_ok(b"^abc$"),
-        vec![
+        &[
             AstNode::AnchorStart,
             AstNode::Literal(b'a'),
             AstNode::Literal(b'b'),
@@ -88,7 +88,7 @@ fn test_anchors_parser() {
     );
     assert_eq!(
         parse_ok(b"abc$"),
-        vec![
+        &[
             AstNode::Literal(b'a'),
             AstNode::Literal(b'b'),
             AstNode::Literal(b'c'),
@@ -97,7 +97,7 @@ fn test_anchors_parser() {
     );
     assert_eq!(
         parse_ok(b"^abc"),
-        vec![
+        &[
             AstNode::AnchorStart,
             AstNode::Literal(b'a'),
             AstNode::Literal(b'b'),
@@ -110,23 +110,23 @@ fn test_anchors_parser() {
 fn test_quantifiers_parser() {
     assert_eq!(
         parse_ok(b"a*"),
-        vec![quantified(AstNode::Literal(b'a'), Quantifier::Star)]
+        &[quantified(AstNode::Literal(b'a'), Quantifier::Star)]
     );
     assert_eq!(
         parse_ok(b"a+"),
-        vec![quantified(AstNode::Literal(b'a'), Quantifier::Plus)]
+        &[quantified(AstNode::Literal(b'a'), Quantifier::Plus)]
     );
     assert_eq!(
         parse_ok(b"a?"),
-        vec![quantified(AstNode::Literal(b'a'), Quantifier::Question)]
+        &[quantified(AstNode::Literal(b'a'), Quantifier::Question)]
     );
     assert_eq!(
         parse_ok(b"a-"),
-        vec![quantified(AstNode::Literal(b'a'), Quantifier::Minus)]
+        &[quantified(AstNode::Literal(b'a'), Quantifier::Minus)]
     );
     assert_eq!(
         parse_ok(b"a.*c+d?e-"),
-        vec![
+        &[
             AstNode::Literal(b'a'),
             quantified(AstNode::Any, Quantifier::Star),
             quantified(AstNode::Literal(b'c'), Quantifier::Plus),
@@ -136,11 +136,11 @@ fn test_quantifiers_parser() {
     );
     assert_eq!(
         parse_ok(b"%d+"),
-        vec![quantified(AstNode::Class(b'd', false), Quantifier::Plus)]
+        &[quantified(AstNode::Class(b'd', false), Quantifier::Plus)]
     );
     assert_eq!(
         parse_ok(b".*"),
-        vec![quantified(AstNode::Any, Quantifier::Star)]
+        &[quantified(AstNode::Any, Quantifier::Star)]
     );
 }
 
@@ -148,43 +148,43 @@ fn test_quantifiers_parser() {
 fn test_sets_parser() {
     assert_eq!(
         parse_ok(b"[]"),
-        vec![AstNode::Set(make_set(&[], &[], &[], false))]
+        &[AstNode::Set(make_set(&[], &[], &[], false))]
     );
     assert_eq!(
         parse_ok(b"[abc]"),
-        vec![AstNode::Set(make_set(b"abc", &[], &[], false))]
+        &[AstNode::Set(make_set(b"abc", &[], &[], false))]
     );
     assert_eq!(
         parse_ok(b"[^abc]"),
-        vec![AstNode::Set(make_set(b"abc", &[], &[], true))]
+        &[AstNode::Set(make_set(b"abc", &[], &[], true))]
     );
     assert_eq!(
         parse_ok(b"[a-c]"),
-        vec![AstNode::Set(make_set(&[], &[(b'a', b'c')], &[], false))]
+        &[AstNode::Set(make_set(&[], &[(b'a', b'c')], &[], false))]
     );
     assert_eq!(
         parse_ok(b"[^a-c]"),
-        vec![AstNode::Set(make_set(&[], &[(b'a', b'c')], &[], true))]
+        &[AstNode::Set(make_set(&[], &[(b'a', b'c')], &[], true))]
     );
     assert_eq!(
         parse_ok(b"[a.^$]"),
-        vec![AstNode::Set(make_set(b"a.^$", &[], &[], false))]
+        &[AstNode::Set(make_set(b"a.^$", &[], &[], false))]
     );
     assert_eq!(
         parse_ok(b"[%a]"),
-        vec![AstNode::Set(make_set(&[], &[], b"a", false))]
+        &[AstNode::Set(make_set(&[], &[], b"a", false))]
     );
     assert_eq!(
         parse_ok(b"[%%]"),
-        vec![AstNode::Set(make_set(b"%", &[], &[], false))]
+        &[AstNode::Set(make_set(b"%", &[], &[], false))]
     );
     assert_eq!(
         parse_ok(b"[-abc]"),
-        vec![AstNode::Set(make_set(b"-abc", &[], &[], false))]
+        &[AstNode::Set(make_set(b"-abc", &[], &[], false))]
     );
     assert_eq!(
         parse_ok(b"[abc-]"),
-        vec![AstNode::Set(make_set(b"abc-", &[], &[], false))]
+        &[AstNode::Set(make_set(b"abc-", &[], &[], false))]
     );
 }
 
@@ -192,7 +192,7 @@ fn test_sets_parser() {
 fn test_set_quantifier_parser() {
     assert_eq!(
         parse_ok(b"[abc]*"),
-        vec![quantified(
+        &[quantified(
             AstNode::Set(make_set(b"abc", &[], &[], false)),
             Quantifier::Star
         )]
@@ -203,21 +203,21 @@ fn test_set_quantifier_parser() {
 fn test_captures_parser() {
     assert_eq!(
         parse_ok(b"()"),
-        vec![AstNode::Capture {
+        &[AstNode::Capture {
             index: 1,
             inner: vec![]
         }]
     );
     assert_eq!(
         parse_ok(b"(a)"),
-        vec![AstNode::Capture {
+        &[AstNode::Capture {
             index: 1,
             inner: vec![AstNode::Literal(b'a')]
         }]
     );
     assert_eq!(
         parse_ok(b"(a%d+)"),
-        vec![AstNode::Capture {
+        &[AstNode::Capture {
             index: 1,
             inner: vec![
                 AstNode::Literal(b'a'),
@@ -227,7 +227,7 @@ fn test_captures_parser() {
     );
     assert_eq!(
         parse_ok(b"(a(b)c)"),
-        vec![AstNode::Capture {
+        &[AstNode::Capture {
             index: 1,
             inner: vec![
                 AstNode::Literal(b'a'),
@@ -241,7 +241,7 @@ fn test_captures_parser() {
     );
     assert_eq!(
         parse_ok(b"(a)?"),
-        vec![quantified(
+        &[quantified(
             AstNode::Capture {
                 index: 1,
                 inner: vec![AstNode::Literal(b'a')]
@@ -251,14 +251,14 @@ fn test_captures_parser() {
     );
     assert_eq!(
         parse_ok(b"a?b"),
-        vec![
+        &[
             quantified(AstNode::Literal(b'a'), Quantifier::Question),
             AstNode::Literal(b'b')
         ]
     );
     assert_eq!(
         parse_ok(b"a-b"),
-        vec![
+        &[
             quantified(AstNode::Literal(b'a'), Quantifier::Minus),
             AstNode::Literal(b'b')
         ]
@@ -267,10 +267,10 @@ fn test_captures_parser() {
 
 #[test]
 fn test_balanced_frontier_parser() {
-    assert_eq!(parse_ok(b"%b()"), vec![AstNode::Balanced(b'(', b')')]);
+    assert_eq!(parse_ok(b"%b()"), &[AstNode::Balanced(b'(', b')')]);
     assert_eq!(
         parse_ok(b"%f[ac]"),
-        vec![AstNode::Frontier(make_set(b"ac", &[], &[], false))]
+        &[AstNode::Frontier(make_set(b"ac", &[], &[], false))]
     );
 }
 
@@ -278,7 +278,7 @@ fn test_balanced_frontier_parser() {
 fn test_complex_parser() {
     assert_eq!(
         parse_ok(b"^(%b())%d*$"),
-        vec![
+        &[
             AstNode::AnchorStart,
             AstNode::Capture {
                 index: 1,
@@ -292,8 +292,8 @@ fn test_complex_parser() {
 
 #[test]
 fn test_escaped_rparen_rbracket_without_panic() {
-    assert_eq!(parse_ok(b"%]"), vec![AstNode::Literal(b']')]);
-    assert_eq!(parse_ok(b"%)"), vec![AstNode::Literal(b')')])
+    assert_eq!(parse_ok(b"%]"), &[AstNode::Literal(b']')]);
+    assert_eq!(parse_ok(b"%)"), &[AstNode::Literal(b')')])
 }
 
 #[test]
@@ -331,7 +331,7 @@ fn test_throw_parser_errors() {
     );
     assert!(matches!(parse_err(b"%z"), Err(Error::Lexer(_))));
 
-    assert_eq!(parse_ok(b"%1"), vec![AstNode::CaptureRef(1)]);
+    assert_eq!(parse_ok(b"%1"), &[AstNode::CaptureRef(1)]);
 
     let too_many_captures = "()".repeat(LUA_MAXCAPTURES + 1);
     assert!(
@@ -343,31 +343,31 @@ fn test_throw_parser_errors() {
 fn test_special_byte_edge_cases_parser() {
     assert_eq!(
         parse_ok(b"[%%]"),
-        vec![AstNode::Set(make_set(b"%", &[], &[], false))]
+        &[AstNode::Set(make_set(b"%", &[], &[], false))]
     );
     assert_eq!(
         parse_ok(b"[%-]"),
-        vec![AstNode::Set(make_set(b"-", &[], &[], false))]
+        &[AstNode::Set(make_set(b"-", &[], &[], false))]
     );
     assert_eq!(
         parse_ok(b"[%]]"),
-        vec![AstNode::Set(make_set(b"]", &[], &[], false))]
+        &[AstNode::Set(make_set(b"]", &[], &[], false))]
     );
     assert_eq!(
         parse_ok(b"[%[]"),
-        vec![AstNode::Set(make_set(b"[", &[], &[], false))]
+        &[AstNode::Set(make_set(b"[", &[], &[], false))]
     );
 
     assert_eq!(
         parse_ok(b"%*+%?"),
-        vec![
+        &[
             quantified(AstNode::Literal(b'*'), Quantifier::Plus),
             AstNode::Literal(b'?')
         ]
     );
     assert_eq!(
         parse_ok(b"[%[]"),
-        vec![AstNode::Set(make_set(b"[", &[], &[], false))]
+        &[AstNode::Set(make_set(b"[", &[], &[], false))]
     );
 }
 
@@ -375,7 +375,7 @@ fn test_special_byte_edge_cases_parser() {
 fn test_nested_complex_patterns_parser() {
     assert_eq!(
         parse_ok(b"((a+)?(b*))+"),
-        vec![quantified(
+        &[quantified(
             AstNode::Capture {
                 index: 1,
                 inner: vec![
@@ -398,7 +398,7 @@ fn test_nested_complex_patterns_parser() {
 
     assert_eq!(
         parse_ok(b"(%f[%a]%w+)"),
-        vec![AstNode::Capture {
+        &[AstNode::Capture {
             index: 1,
             inner: vec![
                 AstNode::Frontier(make_set(&[], &[], b"a", false)),
