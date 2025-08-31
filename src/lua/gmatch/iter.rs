@@ -1,4 +1,4 @@
-use crate::{AstNode, Result, engine::find_first_match};
+use crate::{engine::find_first_match, AstNode, Result};
 
 pub struct GMatchIterator {
     pub(super) bytes: Vec<u8>,

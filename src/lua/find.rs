@@ -1,5 +1,5 @@
 use super::{
-    super::{Parser, Result, engine::find_first_match},
+    super::{engine::find_first_match, Parser, Result},
     calculate_start_index,
 };
 

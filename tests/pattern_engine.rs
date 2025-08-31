@@ -1,4 +1,4 @@
-use lsonar::{LUA_MAXCAPTURES, Parser, Result, engine::find_first_match};
+use lsonar::{engine::find_first_match, Parser, Result, LUA_MAXCAPTURES};
 use std::ops::Range;
 
 fn find(

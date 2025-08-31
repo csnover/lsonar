@@ -1,10 +1,10 @@
 use std::ops::Range;
 
 use super::{
-    Result,
     ast::{AstNode, Quantifier},
+    Result,
 };
-use state::{MAX_RECURSION_DEPTH, State};
+use state::{State, MAX_RECURSION_DEPTH};
 
 mod state;
 

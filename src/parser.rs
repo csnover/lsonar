@@ -1,8 +1,8 @@
 use super::{
-    Error, LUA_MAXCAPTURES, Result,
     ast::{AstNode, Quantifier},
     charset::CharSet,
     lexer::{Lexer, Token},
+    Error, Result, LUA_MAXCAPTURES,
 };
 use std::iter::Peekable;
 

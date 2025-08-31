@@ -1,5 +1,5 @@
 use lsonar::charset::CharSet;
-use lsonar::{AstNode, Error, LUA_MAXCAPTURES, Parser, Quantifier, Result};
+use lsonar::{AstNode, Error, Parser, Quantifier, Result, LUA_MAXCAPTURES};
 
 fn parse_ok(pattern: &[u8]) -> Vec<AstNode> {
     Parser::new(pattern)

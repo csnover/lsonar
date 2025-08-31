@@ -1,4 +1,4 @@
-use super::super::{Parser, Result, engine::find_first_match};
+use super::super::{engine::find_first_match, Parser, Result};
 use repl::process_replacement_string;
 
 mod repl;

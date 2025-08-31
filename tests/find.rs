@@ -1,4 +1,4 @@
-use lsonar::{Error, find};
+use lsonar::{find, Error};
 
 fn svec(items: &[&str]) -> Vec<String> {
     items.iter().map(|&s| s.to_string()).collect()
