@@ -44,9 +44,9 @@ pub struct Lexer<'a> {
 }
 
 impl<'a> Lexer<'a> {
-    pub fn new(input: &'a str) -> Self {
+    pub fn new(input: &'a [u8]) -> Self {
         Lexer {
-            input: input.as_bytes(),
+            input,
             pos: 0,
             capture_depth: 0,
             set_depth: 0,

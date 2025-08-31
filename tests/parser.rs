@@ -1,14 +1,17 @@
 use lsonar::charset::CharSet;
 use lsonar::{AstNode, Error, LUA_MAXCAPTURES, Parser, Quantifier, Result};
 
-fn parse_ok(pattern: &str) -> Vec<AstNode> {
+fn parse_ok(pattern: &[u8]) -> Vec<AstNode> {
     Parser::new(pattern)
         .expect("Parser::new failed")
         .parse()
-        .expect(&format!("Parser failed for pattern: {}", pattern))
+        .expect(&format!(
+            "Parser failed for pattern: {}",
+            str::from_utf8(pattern).unwrap()
+        ))
 }
 
-fn parse_err(pattern: &str) -> Result<Vec<AstNode>> {
+fn parse_err(pattern: &[u8]) -> Result<Vec<AstNode>> {
     let mut parser = Parser::new(pattern)?;
     parser.parse()
 }
@@ -40,7 +43,7 @@ fn make_set(bytes: &[u8], ranges: &[(u8, u8)], classes: &[u8], negated: bool) ->
 #[test]
 fn test_simple_sequence_parser() {
     assert_eq!(
-        parse_ok("abc"),
+        parse_ok(b"abc"),
         vec![
             AstNode::Literal(b'a'),
             AstNode::Literal(b'b'),
@@ -48,11 +51,11 @@ fn test_simple_sequence_parser() {
         ]
     );
     assert_eq!(
-        parse_ok("a.c"),
+        parse_ok(b"a.c"),
         vec![AstNode::Literal(b'a'), AstNode::Any, AstNode::Literal(b'c')]
     );
     assert_eq!(
-        parse_ok("a%dc"),
+        parse_ok(b"a%dc"),
         vec![
             AstNode::Literal(b'a'),
             AstNode::Class(b'd', false),
@@ -60,7 +63,7 @@ fn test_simple_sequence_parser() {
         ]
     );
     assert_eq!(
-        parse_ok("a%Dc"),
+        parse_ok(b"a%Dc"),
         vec![
             AstNode::Literal(b'a'),
             AstNode::Class(b'd', true),
@@ -72,7 +75,7 @@ fn test_simple_sequence_parser() {
 #[test]
 fn test_anchors_parser() {
     assert_eq!(
-        parse_ok("^abc$"),
+        parse_ok(b"^abc$"),
         vec![
             AstNode::AnchorStart,
             AstNode::Literal(b'a'),
@@ -82,7 +85,7 @@ fn test_anchors_parser() {
         ]
     );
     assert_eq!(
-        parse_ok("abc$"),
+        parse_ok(b"abc$"),
         vec![
             AstNode::Literal(b'a'),
             AstNode::Literal(b'b'),
@@ -91,7 +94,7 @@ fn test_anchors_parser() {
         ]
     );
     assert_eq!(
-        parse_ok("^abc"),
+        parse_ok(b"^abc"),
         vec![
             AstNode::AnchorStart,
             AstNode::Literal(b'a'),
@@ -104,23 +107,23 @@ fn test_anchors_parser() {
 #[test]
 fn test_quantifiers_parser() {
     assert_eq!(
-        parse_ok("a*"),
+        parse_ok(b"a*"),
         vec![quantified(AstNode::Literal(b'a'), Quantifier::Star)]
     );
     assert_eq!(
-        parse_ok("a+"),
+        parse_ok(b"a+"),
         vec![quantified(AstNode::Literal(b'a'), Quantifier::Plus)]
     );
     assert_eq!(
-        parse_ok("a?"),
+        parse_ok(b"a?"),
         vec![quantified(AstNode::Literal(b'a'), Quantifier::Question)]
     );
     assert_eq!(
-        parse_ok("a-"),
+        parse_ok(b"a-"),
         vec![quantified(AstNode::Literal(b'a'), Quantifier::Minus)]
     );
     assert_eq!(
-        parse_ok("a.*c+d?e-"),
+        parse_ok(b"a.*c+d?e-"),
         vec![
             AstNode::Literal(b'a'),
             quantified(AstNode::Any, Quantifier::Star),
@@ -130,11 +133,11 @@ fn test_quantifiers_parser() {
         ]
     );
     assert_eq!(
-        parse_ok("%d+"),
+        parse_ok(b"%d+"),
         vec![quantified(AstNode::Class(b'd', false), Quantifier::Plus)]
     );
     assert_eq!(
-        parse_ok(".*"),
+        parse_ok(b".*"),
         vec![quantified(AstNode::Any, Quantifier::Star)]
     );
 }
@@ -142,27 +145,27 @@ fn test_quantifiers_parser() {
 #[test]
 fn test_sets_parser() {
     assert_eq!(
-        parse_ok("[]"),
+        parse_ok(b"[]"),
         vec![AstNode::Set(make_set(&[], &[], &[], false))]
     );
     assert_eq!(
-        parse_ok("[abc]"),
+        parse_ok(b"[abc]"),
         vec![AstNode::Set(make_set(&[b'a', b'b', b'c'], &[], &[], false))]
     );
     assert_eq!(
-        parse_ok("[^abc]"),
+        parse_ok(b"[^abc]"),
         vec![AstNode::Set(make_set(&[b'a', b'b', b'c'], &[], &[], true))]
     );
     assert_eq!(
-        parse_ok("[a-c]"),
+        parse_ok(b"[a-c]"),
         vec![AstNode::Set(make_set(&[], &[(b'a', b'c')], &[], false))]
     );
     assert_eq!(
-        parse_ok("[^a-c]"),
+        parse_ok(b"[^a-c]"),
         vec![AstNode::Set(make_set(&[], &[(b'a', b'c')], &[], true))]
     );
     assert_eq!(
-        parse_ok("[a.^$]"),
+        parse_ok(b"[a.^$]"),
         vec![AstNode::Set(make_set(
             &[b'a', b'.', b'^', b'$'],
             &[],
@@ -171,15 +174,15 @@ fn test_sets_parser() {
         ))]
     );
     assert_eq!(
-        parse_ok("[%a]"),
+        parse_ok(b"[%a]"),
         vec![AstNode::Set(make_set(&[], &[], &[b'a'], false))]
     );
     assert_eq!(
-        parse_ok("[%%]"),
+        parse_ok(b"[%%]"),
         vec![AstNode::Set(make_set(&[b'%'], &[], &[], false))]
     );
     assert_eq!(
-        parse_ok("[-abc]"),
+        parse_ok(b"[-abc]"),
         vec![AstNode::Set(make_set(
             &[b'-', b'a', b'b', b'c'],
             &[],
@@ -188,7 +191,7 @@ fn test_sets_parser() {
         ))]
     );
     assert_eq!(
-        parse_ok("[abc-]"),
+        parse_ok(b"[abc-]"),
         vec![AstNode::Set(make_set(
             &[b'a', b'b', b'c', b'-'],
             &[],
@@ -201,7 +204,7 @@ fn test_sets_parser() {
 #[test]
 fn test_set_quantifier_parser() {
     assert_eq!(
-        parse_ok("[abc]*"),
+        parse_ok(b"[abc]*"),
         vec![quantified(
             AstNode::Set(make_set(&[b'a', b'b', b'c'], &[], &[], false)),
             Quantifier::Star
@@ -212,21 +215,21 @@ fn test_set_quantifier_parser() {
 #[test]
 fn test_captures_parser() {
     assert_eq!(
-        parse_ok("()"),
+        parse_ok(b"()"),
         vec![AstNode::Capture {
             index: 1,
             inner: vec![]
         }]
     );
     assert_eq!(
-        parse_ok("(a)"),
+        parse_ok(b"(a)"),
         vec![AstNode::Capture {
             index: 1,
             inner: vec![AstNode::Literal(b'a')]
         }]
     );
     assert_eq!(
-        parse_ok("(a%d+)"),
+        parse_ok(b"(a%d+)"),
         vec![AstNode::Capture {
             index: 1,
             inner: vec![
@@ -236,7 +239,7 @@ fn test_captures_parser() {
         }]
     );
     assert_eq!(
-        parse_ok("(a(b)c)"),
+        parse_ok(b"(a(b)c)"),
         vec![AstNode::Capture {
             index: 1,
             inner: vec![
@@ -250,7 +253,7 @@ fn test_captures_parser() {
         }]
     );
     assert_eq!(
-        parse_ok("(a)?"),
+        parse_ok(b"(a)?"),
         vec![quantified(
             AstNode::Capture {
                 index: 1,
@@ -260,14 +263,14 @@ fn test_captures_parser() {
         )]
     );
     assert_eq!(
-        parse_ok("a?b"),
+        parse_ok(b"a?b"),
         vec![
             quantified(AstNode::Literal(b'a'), Quantifier::Question),
             AstNode::Literal(b'b')
         ]
     );
     assert_eq!(
-        parse_ok("a-b"),
+        parse_ok(b"a-b"),
         vec![
             quantified(AstNode::Literal(b'a'), Quantifier::Minus),
             AstNode::Literal(b'b')
@@ -277,9 +280,9 @@ fn test_captures_parser() {
 
 #[test]
 fn test_balanced_frontier_parser() {
-    assert_eq!(parse_ok("%b()"), vec![AstNode::Balanced(b'(', b')')]);
+    assert_eq!(parse_ok(b"%b()"), vec![AstNode::Balanced(b'(', b')')]);
     assert_eq!(
-        parse_ok("%f[ac]"),
+        parse_ok(b"%f[ac]"),
         vec![AstNode::Frontier(make_set(&[b'a', b'c'], &[], &[], false))]
     );
 }
@@ -287,7 +290,7 @@ fn test_balanced_frontier_parser() {
 #[test]
 fn test_complex_parser() {
     assert_eq!(
-        parse_ok("^(%b())%d*$"),
+        parse_ok(b"^(%b())%d*$"),
         vec![
             AstNode::AnchorStart,
             AstNode::Capture {
@@ -302,73 +305,81 @@ fn test_complex_parser() {
 
 #[test]
 fn test_escaped_rparen_rbracket_without_panic() {
-    assert_eq!(parse_ok("%]"), vec![AstNode::Literal(b']')]);
-    assert_eq!(parse_ok("%)"), vec![AstNode::Literal(b')')])
+    assert_eq!(parse_ok(b"%]"), vec![AstNode::Literal(b']')]);
+    assert_eq!(parse_ok(b"%)"), vec![AstNode::Literal(b')')])
 }
 
 #[test]
 fn test_throw_parser_errors() {
     assert!(
-        matches!(parse_err("("), Err(Error::Parser(s)) if s.contains("malformed pattern (unexpected end, expected RParen)"))
+        matches!(parse_err(b"("), Err(Error::Parser(s)) if s.contains("malformed pattern (unexpected end, expected RParen)"))
     );
-    assert!(matches!(parse_err(")"), Err(Error::Parser(s)) if s.contains("unexpected ')'")));
-    assert!(matches!(parse_err("]"), Err(Error::Parser(s)) if s.contains("unexpected ']'")));
+    assert!(matches!(parse_err(b")"), Err(Error::Parser(s)) if s.contains("unexpected ')'")));
+    assert!(matches!(parse_err(b"]"), Err(Error::Parser(s)) if s.contains("unexpected ']'")));
     assert!(
-        matches!(parse_err("["), Err(Error::Parser(s)) if s.contains("unfinished character class"))
+        matches!(parse_err(b"["), Err(Error::Parser(s)) if s.contains("unfinished character class"))
     );
-    assert!(matches!(parse_err("*"), Err(Error::Parser(s)) if s.contains("must follow an item")));
-    assert!(matches!(parse_err("^*"), Err(Error::Parser(s)) if s.contains("cannot be quantified")));
-    assert!(matches!(parse_err("$+"), Err(Error::Parser(s)) if s.contains("cannot be quantified")));
-    assert!(matches!(parse_err("%b"), Err(Error::Lexer(s)) if s.contains("needs two characters")));
-    assert!(matches!(parse_err("%bx"), Err(Error::Lexer(s)) if s.contains("needs two characters")));
-    assert!(matches!(parse_err("%f"), Err(Error::Parser(s)) if s.contains("missing '[' after %f")));
+    assert!(matches!(parse_err(b"*"), Err(Error::Parser(s)) if s.contains("must follow an item")));
     assert!(
-        matches!(parse_err("%fa"), Err(Error::Parser(s)) if s.contains("missing '[' after %f"))
+        matches!(parse_err(b"^*"), Err(Error::Parser(s)) if s.contains("cannot be quantified"))
     );
     assert!(
-        matches!(parse_err("%f["), Err(Error::Parser(s)) if s.contains("unfinished character class"))
+        matches!(parse_err(b"$+"), Err(Error::Parser(s)) if s.contains("cannot be quantified"))
+    );
+    assert!(matches!(parse_err(b"%b"), Err(Error::Lexer(s)) if s.contains("needs two characters")));
+    assert!(
+        matches!(parse_err(b"%bx"), Err(Error::Lexer(s)) if s.contains("needs two characters"))
     );
     assert!(
-        matches!(parse_err("%f[a"), Err(Error::Parser(s)) if s.contains("unfinished character class"))
+        matches!(parse_err(b"%f"), Err(Error::Parser(s)) if s.contains("missing '[' after %f"))
     );
-    assert!(matches!(parse_err("%z"), Err(Error::Lexer(_))));
+    assert!(
+        matches!(parse_err(b"%fa"), Err(Error::Parser(s)) if s.contains("missing '[' after %f"))
+    );
+    assert!(
+        matches!(parse_err(b"%f["), Err(Error::Parser(s)) if s.contains("unfinished character class"))
+    );
+    assert!(
+        matches!(parse_err(b"%f[a"), Err(Error::Parser(s)) if s.contains("unfinished character class"))
+    );
+    assert!(matches!(parse_err(b"%z"), Err(Error::Lexer(_))));
 
-    assert_eq!(parse_ok("%1"), vec![AstNode::CaptureRef(1)]);
+    assert_eq!(parse_ok(b"%1"), vec![AstNode::CaptureRef(1)]);
 
     let too_many_captures = "()".repeat(LUA_MAXCAPTURES + 1);
     assert!(
-        matches!(parse_err(&too_many_captures), Err(Error::Parser(s)) if s.contains("too many captures"))
+        matches!(parse_err(&too_many_captures.as_bytes()), Err(Error::Parser(s)) if s.contains("too many captures"))
     );
 }
 
 #[test]
 fn test_special_byte_edge_cases_parser() {
     assert_eq!(
-        parse_ok("[%%]"),
+        parse_ok(b"[%%]"),
         vec![AstNode::Set(make_set(&[b'%'], &[], &[], false))]
     );
     assert_eq!(
-        parse_ok("[%-]"),
+        parse_ok(b"[%-]"),
         vec![AstNode::Set(make_set(&[b'-'], &[], &[], false))]
     );
     assert_eq!(
-        parse_ok("[%]]"),
+        parse_ok(b"[%]]"),
         vec![AstNode::Set(make_set(&[b']'], &[], &[], false))]
     );
     assert_eq!(
-        parse_ok("[%[]"),
+        parse_ok(b"[%[]"),
         vec![AstNode::Set(make_set(&[b'['], &[], &[], false))]
     );
 
     assert_eq!(
-        parse_ok("%*+%?"),
+        parse_ok(b"%*+%?"),
         vec![
             quantified(AstNode::Literal(b'*'), Quantifier::Plus),
             AstNode::Literal(b'?')
         ]
     );
     assert_eq!(
-        parse_ok("[%[]"),
+        parse_ok(b"[%[]"),
         vec![AstNode::Set(make_set(&[b'['], &[], &[], false))]
     );
 }
@@ -376,7 +387,7 @@ fn test_special_byte_edge_cases_parser() {
 #[test]
 fn test_nested_complex_patterns_parser() {
     assert_eq!(
-        parse_ok("((a+)?(b*))+"),
+        parse_ok(b"((a+)?(b*))+"),
         vec![quantified(
             AstNode::Capture {
                 index: 1,
@@ -399,7 +410,7 @@ fn test_nested_complex_patterns_parser() {
     );
 
     assert_eq!(
-        parse_ok("(%f[%a]%w+)"),
+        parse_ok(b"(%f[%a]%w+)"),
         vec![AstNode::Capture {
             index: 1,
             inner: vec![
@@ -412,21 +423,21 @@ fn test_nested_complex_patterns_parser() {
 
 #[test]
 fn test_real_world_patterns_parser() {
-    assert!(parse_ok("https?://[%w%.%-%+]+%.%w+").len() > 0);
+    assert!(parse_ok(b"https?://[%w%.%-%+]+%.%w+").len() > 0);
 
-    assert!(parse_ok("^[%w%.%+%-]+@[%w%.%+%-]+%.%w+$").len() > 0);
+    assert!(parse_ok(b"^[%w%.%+%-]+@[%w%.%+%-]+%.%w+$").len() > 0);
 
-    assert!(parse_ok("(%d%d?)/(%d%d?)/(%d%d%d%d)").len() > 0);
+    assert!(parse_ok(b"(%d%d?)/(%d%d?)/(%d%d%d%d)").len() > 0);
 
-    assert!(parse_ok("(%d+)%.(%d+)%.(%d+)%.(%d+)").len() > 0);
+    assert!(parse_ok(b"(%d+)%.(%d+)%.(%d+)%.(%d+)").len() > 0);
 
-    assert!(parse_ok("\"([^\"]+)\":%s*\"([^\"]*)\"").len() > 0);
+    assert!(parse_ok(b"\"([^\"]+)\":%s*\"([^\"]*)\"").len() > 0);
 }
 
 #[test]
 fn test_special_lua_pattern_features_parser() {
-    assert!(parse_ok("%1").len() > 0);
-    assert!(parse_ok("(.)%1").len() > 0);
-    assert!(parse_ok("%b{}").len() > 0);
-    assert!(parse_ok("%f[%a]").len() > 0);
+    assert!(parse_ok(b"%1").len() > 0);
+    assert!(parse_ok(b"(.)%1").len() > 0);
+    assert!(parse_ok(b"%b{}").len() > 0);
+    assert!(parse_ok(b"%f[%a]").len() > 0);
 }

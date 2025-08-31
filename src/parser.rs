@@ -35,7 +35,7 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(pattern: &str) -> Result<Self> {
+    pub fn new(pattern: &[u8]) -> Result<Self> {
         let mut lexer = Lexer::new(pattern);
         let mut token_vec = Vec::new();
         loop {
