@@ -1,7 +1,11 @@
 use super::{
-    super::{Parser, Result, engine::find_first_match},
+    super::{
+        Parser, Result,
+        engine::{MatchRanges, find_first_match},
+    },
     Captures, calculate_start_index,
 };
+use std::borrow::Cow;
 
 /// Corresponds to Lua 5.3 `string.match`
 pub fn r#match<'a>(text: &'a [u8], pattern: &[u8], init: Option<isize>) -> Result<Captures<'a>> {
@@ -13,15 +17,19 @@ pub fn r#match<'a>(text: &'a [u8], pattern: &[u8], init: Option<isize>) -> Resul
     let ast = parser.parse()?;
 
     Ok(match find_first_match(&ast, text, start_byte_index) {
-        Some((match_byte_range, captures_byte_ranges)) => {
-            let captures = captures_byte_ranges;
+        Some(MatchRanges {
+            full_match,
+            captures,
+        }) => {
             let has_captures = !captures.is_empty();
 
             if has_captures {
-                captures.into_iter().map(|range| &text[range]).collect()
+                captures
+                    .into_iter()
+                    .map(|range| Cow::Borrowed(&text[range]))
+                    .collect()
             } else {
-                let full_match = &text[match_byte_range];
-                vec![full_match]
+                vec![Cow::Borrowed(&text[full_match])]
             }
         }
         None => vec![],

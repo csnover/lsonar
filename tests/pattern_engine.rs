@@ -1,7 +1,12 @@
-use lsonar::{Parser, Result, engine::find_first_match};
+#![allow(clippy::single_range_in_vec_init)]
+
+use lsonar::{
+    Parser, Result,
+    engine::{MatchRanges, find_first_match},
+};
 use std::ops::Range;
 
-fn find(pattern_str: &[u8], text: &[u8]) -> Result<Option<(Range<usize>, Vec<Range<usize>>)>> {
+fn find(pattern_str: &[u8], text: &[u8]) -> Result<Option<MatchRanges>> {
     let mut parser = Parser::new(pattern_str)?;
     let ast = parser.parse()?;
     Ok(find_first_match(&ast, text, 0)) // 0-based index only for tests
@@ -16,7 +21,10 @@ fn assert_match(
 ) {
     let result = find(pattern, text).expect("find failed");
     match result {
-        Some((full_match, captures)) => {
+        Some(MatchRanges {
+            full_match,
+            captures,
+        }) => {
             assert_eq!(full_match, expected_full, "Full match range mismatch");
             assert_eq!(&captures[..], expected_captures, "Captures mismatch");
         }
@@ -216,7 +224,7 @@ fn test_find_offset_engine() {
     let mut parser = Parser::new(pattern).unwrap();
     let ast = parser.parse().unwrap();
     let result = find_first_match(&ast, text, 1).unwrap();
-    assert_eq!(result, ((1..2, vec![])));
+    assert_eq!(result, (1..2, vec![]));
 
     assert!(find_first_match(&ast, text, 2).is_none());
 }
@@ -246,7 +254,10 @@ fn test_extracting_data_with_captures_engine() {
     let result = find(b"(%d%d?)/(%d%d?)/(%d%d%d%d)", b"Date: 25/12/2023")
         .unwrap()
         .unwrap();
-    let (full, captures) = result;
+    let MatchRanges {
+        full_match: full,
+        captures,
+    } = result;
     assert_eq!(full, 6..16);
     assert_eq!(captures[0], (6..8));
     assert_eq!(captures[1], (9..11));
@@ -258,7 +269,10 @@ fn test_extracting_data_with_captures_engine() {
     )
     .unwrap()
     .unwrap();
-    let (full, captures) = result;
+    let MatchRanges {
+        full_match: full,
+        captures,
+    } = result;
     assert_eq!(full, 9..29);
     assert_eq!(captures[0], (9..17));
     assert_eq!(captures[1], (18..29));
@@ -286,7 +300,10 @@ fn test_complex_pattern_combinations_engine() {
     let text = b"<p>Visit <a href=\"https://example.com\" class=\"link\">Example Site</a> for more info.</p>";
 
     let result = find(pattern, text).unwrap().unwrap();
-    let (full, captures) = result;
+    let MatchRanges {
+        full_match: full,
+        captures,
+    } = result;
     assert_eq!(full, 9..68);
     assert_eq!(captures[0], (18..37));
     assert_eq!(captures[1], (52..64));
@@ -301,7 +318,7 @@ fn test_complex_pattern_combinations_engine() {
     let result = find(b"([^,]+),([^,]+),([^,]+)", b"apple,orange,banana")
         .unwrap()
         .unwrap();
-    let (_, captures) = result;
+    let MatchRanges { captures, .. } = result;
     assert_eq!(captures[0], (0..5));
     assert_eq!(captures[1], (6..12));
     assert_eq!(captures[2], (13..19));
@@ -360,7 +377,10 @@ fn test_real_world_patterns_advanced_engine() {
     let pattern = b"<div class='([^']+)'>([^<]*<span>[^<]*</span>)?([^<]*)</div>";
 
     let result = find(pattern, html).unwrap().unwrap();
-    let (full, captures) = result;
+    let MatchRanges {
+        full_match: full,
+        captures,
+    } = result;
     assert_eq!(full, 0..52);
     assert_eq!(captures[0], (12..16));
     assert_eq!(captures[1], (18..40));
@@ -370,7 +390,10 @@ fn test_real_world_patterns_advanced_engine() {
     let pattern = b"(%d+)%-(%d+)%-(%d+) (%d+):(%d+):(%d+) (%u+)";
 
     let result = find(pattern, log_line).unwrap().unwrap();
-    let (full, captures) = result;
+    let MatchRanges {
+        full_match: full,
+        captures,
+    } = result;
     assert_eq!(full, 0..25);
     assert_eq!(captures[0], (0..4));
     assert_eq!(captures[1], (5..7));

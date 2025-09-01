@@ -1,7 +1,36 @@
-use super::{
-    super::{Parser, Result, engine::find_first_match},
-    Captures, calculate_start_index,
+use super::{Captures, calculate_start_index};
+use crate::{
+    Parser, Result,
+    engine::{MatchRanges, find_first_match},
 };
+use std::borrow::Cow;
+
+/// The indices and optional captures of a found string.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Match<'a> {
+    /// The start index of the found string. This will be 1-indexed if the
+    /// `1-based` feature is enabled.
+    pub start: usize,
+    /// The end index of the found string. This will be an inclusive index
+    /// if the `1-based` feature is enabled.
+    pub end: usize,
+    /// The captured string slices. If a capture did not result in any value,
+    /// it will be an empty slice.
+    pub captures: Captures<'a>,
+}
+
+// TODO: This exists only to avoid having to spend a bunch of time changing the
+// unit tests
+#[doc(hidden)]
+impl<'a> From<(usize, usize, Captures<'a>)> for Match<'a> {
+    fn from((start, end, captures): (usize, usize, Captures<'a>)) -> Self {
+        Self {
+            start,
+            end,
+            captures,
+        }
+    }
+}
 
 /// Corresponds to Lua 5.3 [`string.find`].
 /// Returns 1-based or 0-based (see features [`1-based`] and [`0-based`]) indices (start, end) and captured strings. The [`init`] argument can be either 0-based or 1-based.
@@ -10,21 +39,22 @@ pub fn find<'a>(
     pattern: &[u8],
     init: Option<isize>,
     plain: bool,
-) -> Result<Option<(usize, usize, Captures<'a>)>> {
+) -> Result<Option<Match<'a>>> {
     let byte_len = text_bytes.len();
 
     let start_byte_index = calculate_start_index(byte_len, init);
 
     if plain {
         if pattern.is_empty() {
-            if cfg!(feature = "1-based") {
-                return Ok(Some((
-                    start_byte_index.saturating_add(1),
-                    start_byte_index,
-                    vec![],
-                )));
-            }
-            return Ok(Some((start_byte_index, start_byte_index, vec![])));
+            return Ok(Some(Match {
+                start: if cfg!(feature = "1-based") {
+                    start_byte_index.saturating_add(1)
+                } else {
+                    start_byte_index
+                },
+                end: start_byte_index,
+                captures: vec![],
+            }));
         }
 
         if start_byte_index >= byte_len {
@@ -38,15 +68,15 @@ pub fn find<'a>(
             let zero_based_start_pos = start_byte_index + rel_byte_pos;
             let zero_based_end_pos = zero_based_start_pos + pattern.len();
 
-            let start_pos = if cfg!(feature = "1-based") {
-                zero_based_start_pos.saturating_add(1)
-            } else {
-                zero_based_start_pos
-            };
-
-            let end_pos = zero_based_end_pos;
-
-            Ok(Some((start_pos, end_pos, vec![])))
+            Ok(Some(Match {
+                start: if cfg!(feature = "1-based") {
+                    zero_based_start_pos.saturating_add(1)
+                } else {
+                    zero_based_start_pos
+                },
+                end: zero_based_end_pos,
+                captures: vec![],
+            }))
         } else {
             Ok(None)
         }
@@ -55,21 +85,21 @@ pub fn find<'a>(
         let ast = parser.parse()?;
 
         match find_first_match(&ast, text_bytes, start_byte_index) {
-            Some((match_byte_range, captures_byte_ranges)) => {
-                let start_pos = if cfg!(feature = "1-based") {
-                    match_byte_range.start.saturating_add(1)
+            Some(MatchRanges {
+                full_match,
+                captures,
+            }) => Ok(Some(Match {
+                start: if cfg!(feature = "1-based") {
+                    full_match.start.saturating_add(1)
                 } else {
-                    match_byte_range.start
-                };
-                let end_pos = match_byte_range.end;
-
-                let captured_strings = captures_byte_ranges
+                    full_match.start
+                },
+                end: full_match.end,
+                captures: captures
                     .into_iter()
-                    .map(|range| &text_bytes[range])
-                    .collect();
-
-                Ok(Some((start_pos, end_pos, captured_strings)))
-            }
+                    .map(|range| Cow::Borrowed(&text_bytes[range]))
+                    .collect(),
+            })),
             None => Ok(None),
         }
     }

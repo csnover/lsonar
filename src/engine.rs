@@ -1,10 +1,27 @@
 use std::ops::Range;
 
-use super::ast::{AstNode, Quantifier};
-use crate::ast::AstRoot;
+use super::ast::{AstNode, AstRoot, Quantifier};
 use state::{MAX_RECURSION_DEPTH, State};
 
 mod state;
+
+/// The ranged indexes of a matched pattern. These are always 0-indexed.
+#[derive(Debug, Eq, PartialEq)]
+pub struct MatchRanges {
+    /// The full range of the matched pattern.
+    pub full_match: Range<usize>,
+    /// The ranges of each captured group. If a group did not capture anything,
+    /// the range will be empty.
+    pub captures: Vec<Range<usize>>,
+}
+
+// TODO: This exists only to avoid having to spend a bunch of time changing the
+// unit tests
+impl PartialEq<(Range<usize>, Vec<Range<usize>>)> for MatchRanges {
+    fn eq(&self, other: &(Range<usize>, Vec<Range<usize>>)) -> bool {
+        self.full_match == other.0 && self.captures == other.1
+    }
+}
 
 /// Tries to find the first match of the pattern in the input string,
 /// starting the search at `start_index` (0-based).
@@ -14,7 +31,7 @@ pub fn find_first_match(
     pattern_ast: &AstRoot,
     input: &[u8],
     start_index: usize,
-) -> Option<(Range<usize>, Vec<Range<usize>>)> {
+) -> Option<MatchRanges> {
     let input_len = input.len();
 
     if start_index > input_len {
@@ -27,10 +44,10 @@ pub fn find_first_match(
 
         if let Some(final_state) = match_recursive(pattern_ast, initial_state) {
             let full_match_range = i..final_state.current_pos;
-            return Some((
-                full_match_range,
-                final_state.captures[..pattern_ast.capture_count()].to_vec(),
-            ));
+            return Some(MatchRanges {
+                full_match: full_match_range,
+                captures: final_state.captures[..pattern_ast.capture_count()].to_vec(),
+            });
         }
 
         if let Some(AstNode::AnchorStart) = pattern_ast.first()

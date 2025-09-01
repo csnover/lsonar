@@ -1,6 +1,7 @@
 use lsonar::{Result, gmatch};
+use std::borrow::Cow;
 
-fn collect_gmatch_results<'a>(text: &'a [u8], pattern: &[u8]) -> Result<Vec<Vec<&'a [u8]>>> {
+fn collect_gmatch_results<'a>(text: &'a [u8], pattern: &[u8]) -> Result<Vec<Vec<Cow<'a, [u8]>>>> {
     let it = gmatch(text, pattern)?;
     Ok(it.collect())
 }
@@ -9,7 +10,7 @@ fn collect_gmatch_results<'a>(text: &'a [u8], pattern: &[u8]) -> Result<Vec<Vec<
 fn test_single_match() {
     assert_eq!(
         collect_gmatch_results(b"hello world", b"hello"),
-        Ok(vec![vec![b"hello".as_slice()]])
+        Ok(vec![vec![b"hello".into()]])
     );
 }
 
@@ -17,7 +18,7 @@ fn test_single_match() {
 fn test_repeated_match() {
     assert_eq!(
         collect_gmatch_results(b"hello hello", b"hello"),
-        Ok(vec![vec![b"hello".as_slice()], vec![b"hello".as_slice()]])
+        Ok(vec![vec![b"hello".into()], vec![b"hello".into()]])
     );
 }
 
@@ -25,7 +26,7 @@ fn test_repeated_match() {
 fn test_numeric_pattern() {
     assert_eq!(
         collect_gmatch_results(b"abc123def456", b"%d+"),
-        Ok(vec![vec![b"123".as_slice()], vec![b"456".as_slice()]])
+        Ok(vec![vec![b"123".into()], vec![b"456".into()]])
     );
 }
 
@@ -34,8 +35,8 @@ fn test_captures() {
     assert_eq!(
         collect_gmatch_results(b"name=John age=25", b"(%a+)=(%w+)"),
         Ok(vec![
-            vec![b"name".as_slice(), b"John"],
-            vec![b"age".as_slice(), b"25"]
+            vec![b"name".into(), b"John".into()],
+            vec![b"age".into(), b"25".into()]
         ])
     );
 }
@@ -45,9 +46,9 @@ fn test_single_char_captures() {
     assert_eq!(
         collect_gmatch_results(b"a=1 b=2 c=3", b"(%a)=(%d)"),
         Ok(vec![
-            vec![b"a".as_slice(), b"1"],
-            vec![b"b", b"2"],
-            vec![b"c", b"3"]
+            vec![b"a".into(), b"1".into()],
+            vec![b"b".into(), b"2".into()],
+            vec![b"c".into(), b"3".into()]
         ])
     );
 }
@@ -56,7 +57,7 @@ fn test_single_char_captures() {
 fn test_empty_captures() {
     assert_eq!(
         collect_gmatch_results(b"abc", b"()a()"),
-        Ok(vec![vec![b"".as_slice(), b""]])
+        Ok(vec![vec![b"".into(), b"".into()]])
     );
 }
 
@@ -66,7 +67,7 @@ fn test_empty_pattern() {
     assert_eq!(result.len(), 4);
 
     for r in result {
-        assert_eq!(r, vec![b"".as_slice()]);
+        assert_eq!(r, vec![Cow::Borrowed(b"")]);
     }
 }
 
@@ -78,8 +79,8 @@ fn test_ip_address_pattern() {
             b"(%d+)%.(%d+)%.(%d+)%.(%d+)"
         ),
         Ok(vec![
-            vec![b"192".as_slice(), b"168", b"1", b"1"],
-            vec![b"10", b"0", b"0", b"1"]
+            vec![b"192".into(), b"168".into(), b"1".into(), b"1".into()],
+            vec![b"10".into(), b"0".into(), b"0".into(), b"1".into()]
         ])
     );
 }
@@ -88,7 +89,7 @@ fn test_ip_address_pattern() {
 fn test_html_tag_content() {
     assert_eq!(
         collect_gmatch_results(b"<p>First</p><p>Second</p>", b"<p>([^<]+)</p>"),
-        Ok(vec![vec![b"First".as_slice()], vec![b"Second"]])
+        Ok(vec![vec![b"First".into()], vec![b"Second".into()]])
     );
 }
 
@@ -109,7 +110,11 @@ fn test_empty_string() {
 fn test_single_char_repeated() {
     assert_eq!(
         collect_gmatch_results(b"aaa", b"a"),
-        Ok(vec![vec![b"a".as_slice()], vec![b"a"], vec![b"a"]])
+        Ok(vec![
+            vec![b"a".into()],
+            vec![b"a".into()],
+            vec![b"a".into()]
+        ])
     );
 }
 

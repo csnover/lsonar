@@ -32,6 +32,7 @@ impl std::ops::Deref for AstRoot {
     }
 }
 
+// TODO: This exists only for unit tests
 impl PartialEq<&[AstNode]> for AstRoot {
     fn eq(&self, other: &&[AstNode]) -> bool {
         self.tree == *other

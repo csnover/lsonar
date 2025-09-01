@@ -9,8 +9,9 @@ pub use self::{
     gsub::{Repl, gsub},
     r#match::r#match,
 };
+pub use std::borrow::Cow;
 
-pub type Captures<'a> = Vec<&'a [u8]>;
+pub type Captures<'a> = Vec<Cow<'a, [u8]>>;
 
 fn calculate_start_index(text_len: usize, init: Option<isize>) -> usize {
     match init {

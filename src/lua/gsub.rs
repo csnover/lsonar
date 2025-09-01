@@ -3,6 +3,7 @@ use repl::process_replacement_string;
 
 mod repl;
 
+use crate::engine::MatchRanges;
 pub use repl::Repl;
 
 /// Corresponds to Lua 5.3 `string.gsub`
@@ -23,34 +24,35 @@ pub fn gsub<'a>(
     let max_replacements = n.unwrap_or(usize::MAX);
 
     while replacements < max_replacements
-        && let Some((match_range, captures)) = find_first_match(&pattern_ast, text, last_pos)
+        && let Some(MatchRanges {
+            full_match: match_range,
+            captures,
+        }) = find_first_match(&pattern_ast, text, last_pos)
     {
         result.extend(&text[last_pos..match_range.start]);
 
         let full_match = &text[match_range.clone()];
-        let captures_str = captures
-            .into_iter()
-            .map(|range| &text[range])
-            .collect::<Vec<_>>();
 
         match repl {
             Repl::String(repl_str) => {
+                let captures_str = captures
+                    .into_iter()
+                    .map(|range| &text[range])
+                    .collect::<Vec<_>>();
                 let replacement = process_replacement_string(repl_str, &captures_str);
                 result.extend(&replacement);
             }
             Repl::Function(f) => {
-                let mut args = Vec::with_capacity(captures_str.len() + 1);
-                args.push(full_match);
-                args.extend(captures_str);
+                let args = core::iter::once(full_match)
+                    .chain(captures.into_iter().map(|range| &text[range]))
+                    .collect::<Vec<_>>();
                 let replacement = f(&args);
                 result.extend(&replacement);
             }
             Repl::Table(f) => {
-                let key = if captures_str.is_empty() {
-                    full_match
-                } else {
-                    captures_str[0]
-                };
+                let key = captures
+                    .first()
+                    .map_or(full_match, |range| &text[range.clone()]);
 
                 if let Some(replacement) = f(key) {
                     result.extend(replacement);
