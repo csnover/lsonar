@@ -1,5 +1,5 @@
 use crate::{
-    AstRoot,
+    ast::AstRoot,
     engine::{MatchRanges, find_first_match},
     lua::Captures,
 };

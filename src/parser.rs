@@ -5,12 +5,28 @@ use super::{
     lexer::{Lexer, PosToken, Token},
 };
 
-pub struct Parser<'a> {
+/// Parses a Lua [pattern string](https://www.lua.org/manual/5.3/manual.html#6.4.1) into an AST.
+///
+/// # Errors
+///
+/// If the pattern string cannot be parsed, an [`Error`] is returned.
+pub fn parse_pattern(pattern: &[u8]) -> Result<AstRoot> {
+    Parser::new(pattern)?.parse()
+}
+
+/// Converts a pattern string into an AST.
+struct Parser<'a> {
     lexer: Lexer<'a>,
     capture_count: usize,
 }
 
 impl<'a> Parser<'a> {
+    /// Creates a new parser for the given `pattern`.
+    ///
+    /// # Errors
+    ///
+    /// If the first byte sequence in the input is not a valid token, an
+    /// [`Error`] is returned.
     pub fn new(pattern: &'a [u8]) -> Result<Self> {
         Ok(Parser {
             lexer: Lexer::new(pattern)?,
@@ -18,7 +34,12 @@ impl<'a> Parser<'a> {
         })
     }
 
-    pub fn parse(&mut self) -> Result<AstRoot> {
+    /// Converts the pattern into an [`AstRoot`], consuming the parser.
+    ///
+    /// # Errors
+    ///
+    /// If the pattern string is invalid, an [`Error`] is returned.
+    pub fn parse(mut self) -> Result<AstRoot> {
         let ast = self.parse_sequence(None)?;
 
         if let Some(PosToken { pos, token }) = self.lexer.peek() {

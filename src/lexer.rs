@@ -1,6 +1,8 @@
-pub mod token;
+//! Types for reading a pattern string as a token list.
 
-pub use super::{Error, Result};
+mod token;
+
+use super::{Error, Result};
 pub use token::{PosToken, Token};
 
 fn is_class_byte(c: u8) -> bool {
@@ -35,12 +37,19 @@ fn is_escapable_magic_byte(c: u8) -> bool {
     )
 }
 
+/// Converts a pattern string to tokens.
 pub struct Lexer<'a> {
     inner: Inner<'a>,
     peek_token: Option<PosToken>,
 }
 
 impl<'a> Lexer<'a> {
+    /// Create a new lexer for the given `input`.
+    ///
+    /// # Errors
+    ///
+    /// If the first byte sequence in the input is not a valid token, an
+    /// [`Error`] is returned.
     pub fn new(input: &'a [u8]) -> Result<Self> {
         let mut inner = Inner {
             input,
@@ -54,18 +63,26 @@ impl<'a> Lexer<'a> {
         Ok(Self { inner, peek_token })
     }
 
+    /// Returns the current position of the lexer in the input stream.
     #[inline]
     #[must_use]
     pub fn tell(&self) -> usize {
         self.peek_token.map_or(self.inner.pos, |token| token.pos)
     }
 
+    /// Returns the next token from the input without consuming it.
     #[inline]
     #[must_use]
     pub fn peek(&self) -> Option<PosToken> {
         self.peek_token
     }
 
+    /// Consumes and returns the next token from the input.
+    ///
+    /// # Errors
+    ///
+    /// If the next byte sequence in the input is not a valid token, an
+    /// [`Error`] is returned.
     #[inline]
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Result<Option<PosToken>> {
@@ -74,6 +91,12 @@ impl<'a> Lexer<'a> {
         Ok(next)
     }
 
+    /// Consumes the next token from the input if it matches `expected`.
+    ///
+    /// # Errors
+    ///
+    /// If the next token does not match `expected`, or if the next byte
+    /// sequence in the input is not a valid token, an [`Error`] is returned.
     #[inline]
     pub fn expect(&mut self, expected: Token) -> Result<()> {
         if self.consume(expected)? {
@@ -87,6 +110,13 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    /// Consumes and returns the next token from the input if it matches
+    /// `expected`.
+    ///
+    /// # Errors
+    ///
+    /// If the token is consumed and the next byte sequence in the input is not
+    /// a valid token, an [`Error`] is returned.
     #[inline]
     pub fn consume(&mut self, other: Token) -> Result<bool> {
         let matches = self.next_is(other);
@@ -96,6 +126,13 @@ impl<'a> Lexer<'a> {
         Ok(matches)
     }
 
+    /// Consumes and returns the next token from the input if it does *not*
+    /// match `other`.
+    ///
+    /// # Errors
+    ///
+    /// If the token is consumed and the next byte sequence in the input is not
+    /// a valid token, an [`Error`] is returned.
     #[inline]
     pub fn until(&mut self, other: Token) -> Result<Option<PosToken>> {
         let matches = self.next_is(other);
@@ -104,7 +141,7 @@ impl<'a> Lexer<'a> {
 
     #[inline]
     #[must_use]
-    pub fn next_is(&self, other: Token) -> bool {
+    fn next_is(&self, other: Token) -> bool {
         self.peek_token.is_some_and(|token| *token == other)
     }
 }

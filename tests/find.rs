@@ -1,4 +1,4 @@
-use lsonar::{Error, Token, find};
+use lsonar::{Error, find, lexer::Token};
 
 #[test]
 fn test_negative_byte_classes() {

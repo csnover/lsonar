@@ -1,30 +1,25 @@
 //! A Lua-compatible string pattern matcher library.
 
 #![warn(clippy::pedantic, rust_2018_idioms)]
-#![allow(clippy::missing_errors_doc, clippy::too_many_lines)]
+#![allow(clippy::too_many_lines)]
 
 pub mod ast;
 pub mod charset;
-pub mod engine;
+mod engine;
 pub mod lexer;
-pub mod lua;
-pub mod parser;
+mod lua;
+mod parser;
 
-pub use self::{
-    ast::{AstNode, AstRoot, Quantifier},
-    charset::CharSet,
-    lexer::{Lexer, Token},
-    lua::{Repl, find, gmatch, gsub, r#match},
-    parser::Parser,
-};
+pub use self::lua::{Match, Repl, find, gmatch, gsub, r#match};
 
+/// A pattern string parsing error.
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum Error {
-    /// An invalid character set range or byte class was used.
+    /// The pattern contains an invalid character set range or byte class.
     #[error("{err} at {pos}")]
     CharSet { pos: usize, err: charset::Error },
 
-    /// The pattern ended in the middle of a character class.
+    /// The pattern ends in the middle of a character class.
     #[error("malformed pattern (ends with '%') at {pos}")]
     UnexpectedEnd { pos: usize },
 
@@ -32,11 +27,12 @@ pub enum Error {
     #[error("invalid escape sequence '%{}' at {pos}", lit.escape_ascii())]
     UnknownClass { pos: usize, lit: u8 },
 
-    /// The pattern ended in the middle of a balanced pattern item.
+    /// The pattern ends in the middle of a balanced pattern item.
     #[error("missing arguments to '%b' at {pos}")]
     MissingArgs { pos: usize },
 
-    /// The number of capture groups exceeds the supported number of captures.
+    /// The number of capture groups in the pattern exceeds the supported number
+    /// of captures.
     #[error("too many captures in pattern ({0} > {LUA_MAXCAPTURES})")]
     Captures(usize),
 
@@ -48,17 +44,21 @@ pub enum Error {
     #[error("expected {expected:?}, got {actual:?} at {pos}")]
     ExpectedToken {
         pos: usize,
-        expected: Token,
-        actual: Option<Token>,
+        expected: lexer::Token,
+        actual: Option<lexer::Token>,
     },
 
+    /// The pattern ends in the middle of an item.
     #[error("unexpected end of pattern at {pos}")]
     UnexpectedEndOfPattern { pos: usize },
 
+    /// A bug occurred!
     #[error("internal error: percent token should not reach parser base")]
     InternalError { pos: usize },
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
+/// The standard [`Result`](core::result::Result) type used by lsonar.
+pub type Result<T, E = Error> = core::result::Result<T, E>;
 
+/// The maximum number of allowed capture groups in a pattern.
 pub const LUA_MAXCAPTURES: usize = 32;

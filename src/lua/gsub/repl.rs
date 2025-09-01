@@ -3,7 +3,7 @@ use std::borrow::Cow;
 type Key<'a> = Cow<'a, [u8]>;
 type Captures<'a> = &'a [Cow<'a, [u8]>];
 
-/// String replacement strategy.
+/// The string replacement strategy to use with [`gsub`](crate::gsub).
 #[derive(Clone, Copy)]
 pub enum Repl<'a> {
     /// The string value is used for replacement. The character `%` works as an

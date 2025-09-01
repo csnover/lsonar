@@ -1,21 +1,17 @@
 use lsonar::{
-    AstNode, AstRoot, CharSet, Error, LUA_MAXCAPTURES, Parser, Quantifier, Result, Token,
+    Error, LUA_MAXCAPTURES,
+    ast::{AstNode, AstRoot, Quantifier, parse_pattern},
+    charset::CharSet,
+    lexer::Token,
 };
 
 fn parse_ok(pattern: &[u8]) -> AstRoot {
-    Parser::new(pattern)
-        .expect("Parser::new failed")
-        .parse()
-        .unwrap_or_else(|_| {
-            panic!(
-                "Parser failed for pattern: {}",
-                str::from_utf8(pattern).unwrap()
-            )
-        })
-}
-
-fn parse_err(pattern: &[u8]) -> Result<AstRoot> {
-    Parser::new(pattern)?.parse()
+    parse_pattern(pattern).unwrap_or_else(|_| {
+        panic!(
+            "Parser failed for pattern: {}",
+            str::from_utf8(pattern).unwrap()
+        )
+    })
 }
 
 fn quantified(item: AstNode, quantifier: Quantifier) -> AstNode {
@@ -299,7 +295,7 @@ fn test_escaped_rparen_rbracket_without_panic() {
 #[test]
 fn test_throw_parser_errors() {
     assert!(matches!(
-        parse_err(b"xxxx("),
+        parse_pattern(b"xxxx("),
         Err(Error::ExpectedToken {
             pos: 5,
             expected: Token::RParen,
@@ -307,15 +303,15 @@ fn test_throw_parser_errors() {
         })
     ));
     assert!(matches!(
-        parse_err(b"xx)"),
+        parse_pattern(b"xx)"),
         Err(Error::UnexpectedToken { lit: b')', pos: 2 })
     ));
     assert!(matches!(
-        parse_err(b"x]"),
+        parse_pattern(b"x]"),
         Err(Error::UnexpectedToken { lit: b']', pos: 1 })
     ));
     assert!(matches!(
-        parse_err(b"["),
+        parse_pattern(b"["),
         Err(Error::ExpectedToken {
             pos: 1,
             expected: Token::RBracket,
@@ -323,27 +319,27 @@ fn test_throw_parser_errors() {
         })
     ));
     assert!(matches!(
-        parse_err(b"*"),
+        parse_pattern(b"*"),
         Err(Error::UnexpectedToken { lit: b'*', pos: 0 })
     ));
     assert!(matches!(
-        parse_err(b"^*"),
+        parse_pattern(b"^*"),
         Err(Error::UnexpectedToken { pos: 1, lit: b'*' })
     ));
     assert!(matches!(
-        parse_err(b"$+"),
+        parse_pattern(b"$+"),
         Err(Error::UnexpectedToken { pos: 1, lit: b'+' })
     ));
     assert!(matches!(
-        parse_err(b"%b"),
+        parse_pattern(b"%b"),
         Err(Error::MissingArgs { pos: 2 })
     ));
     assert!(matches!(
-        parse_err(b"%bx"),
+        parse_pattern(b"%bx"),
         Err(Error::MissingArgs { pos: 3 })
     ));
     assert!(matches!(
-        parse_err(b"%f"),
+        parse_pattern(b"%f"),
         Err(Error::ExpectedToken {
             pos: 2,
             expected: Token::LBracket,
@@ -351,7 +347,7 @@ fn test_throw_parser_errors() {
         })
     ));
     assert!(matches!(
-        parse_err(b"%fa"),
+        parse_pattern(b"%fa"),
         Err(Error::ExpectedToken {
             pos: 2,
             expected: Token::LBracket,
@@ -359,7 +355,7 @@ fn test_throw_parser_errors() {
         })
     ));
     assert!(matches!(
-        parse_err(b"%f["),
+        parse_pattern(b"%f["),
         Err(Error::ExpectedToken {
             pos: 3,
             expected: Token::RBracket,
@@ -367,7 +363,7 @@ fn test_throw_parser_errors() {
         })
     ));
     assert!(matches!(
-        parse_err(b"%f[a"),
+        parse_pattern(b"%f[a"),
         Err(Error::ExpectedToken {
             pos: 4,
             expected: Token::RBracket,
@@ -375,7 +371,7 @@ fn test_throw_parser_errors() {
         })
     ));
     assert!(matches!(
-        parse_err(b"%z"),
+        parse_pattern(b"%z"),
         Err(Error::UnknownClass { pos: 0, lit: b'z' })
     ));
 
@@ -383,7 +379,7 @@ fn test_throw_parser_errors() {
 
     let too_many_captures = "()".repeat(LUA_MAXCAPTURES + 1);
     assert!(matches!(
-        parse_err(too_many_captures.as_bytes()),
+        parse_pattern(too_many_captures.as_bytes()),
         Err(Error::Captures(c)) if c == LUA_MAXCAPTURES + 1
     ));
 }

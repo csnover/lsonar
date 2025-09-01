@@ -1,4 +1,4 @@
-use super::super::{Parser, Result, engine::find_first_match};
+use crate::{Result, ast::parse_pattern, engine::find_first_match};
 use repl::process_replacement_string;
 
 mod repl;
@@ -7,17 +7,23 @@ use crate::engine::MatchRanges;
 pub use repl::Repl;
 use std::borrow::Cow;
 
-/// Corresponds to Lua 5.3 `string.gsub`
+/// Like Lua
+/// [`string.gsub`](https://www.lua.org/manual/5.3/manual.html#pdf-string.gsub),
+/// returns a copy of `s` in which all (or the first `n`, if given) occurrences
+/// of `pattern` are replaced by `repl`.
+///
+/// # Errors
+///
+/// If the pattern string could not be parsed, an [`Error`](crate::Error) is returned.
 pub fn gsub<'a>(
-    text: &'a [u8],
+    s: &'a [u8],
     pattern: &[u8],
     repl: Repl<'a>,
     n: Option<usize>,
 ) -> Result<(Vec<u8>, usize)> {
-    let byte_len = text.len();
+    let byte_len = s.len();
 
-    let mut parser = Parser::new(pattern)?;
-    let pattern_ast = parser.parse()?;
+    let pattern_ast = parse_pattern(pattern)?;
 
     let mut result = Vec::new();
     let mut last_pos = 0;
@@ -28,31 +34,31 @@ pub fn gsub<'a>(
         && let Some(MatchRanges {
             full_match: match_range,
             captures,
-        }) = find_first_match(&pattern_ast, text, last_pos)
+        }) = find_first_match(&pattern_ast, s, last_pos)
     {
-        result.extend(&text[last_pos..match_range.start]);
+        result.extend(&s[last_pos..match_range.start]);
 
-        let full_match = &text[match_range.clone()];
+        let full_match = &s[match_range.clone()];
 
         match repl {
             Repl::String(repl_str) => {
                 let captures_str = captures
                     .into_iter()
-                    .map(|range| range.into_bytes(text))
+                    .map(|range| range.into_bytes(s))
                     .collect::<Vec<_>>();
                 let replacement = process_replacement_string(repl_str, &captures_str);
                 result.extend(&replacement);
             }
             Repl::Function(f) => {
                 let args = core::iter::once(Cow::Borrowed(full_match))
-                    .chain(captures.into_iter().map(|range| range.into_bytes(text)))
+                    .chain(captures.into_iter().map(|range| range.into_bytes(s)))
                     .collect::<Vec<_>>();
                 let replacement = f(&args);
                 result.extend(&replacement);
             }
             Repl::Table(f) => {
                 let key = captures.first().map_or(Cow::Borrowed(full_match), |range| {
-                    range.clone().into_bytes(text)
+                    range.clone().into_bytes(s)
                 });
 
                 if let Some(replacement) = f(key) {
@@ -70,13 +76,13 @@ pub fn gsub<'a>(
             if last_pos >= byte_len {
                 break;
             }
-            result.extend(&text[last_pos..=last_pos]);
+            result.extend(&s[last_pos..=last_pos]);
             last_pos += 1;
         }
     }
 
     if last_pos < byte_len {
-        result.extend(&text[last_pos..]);
+        result.extend(&s[last_pos..]);
     }
 
     Ok((result, replacements))

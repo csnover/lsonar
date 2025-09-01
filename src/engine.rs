@@ -4,6 +4,8 @@ use super::ast::{AstNode, AstRoot, Quantifier};
 use state::{MAX_RECURSION_DEPTH, State};
 
 mod state;
+#[cfg(test)]
+mod tests;
 
 /// A capture group.
 #[derive(Clone, Debug, Eq, PartialEq)]

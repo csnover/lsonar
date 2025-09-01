@@ -1,10 +1,10 @@
-pub mod find;
-pub mod gmatch;
-pub mod gsub;
-pub mod r#match;
+mod find;
+mod gmatch;
+mod gsub;
+mod r#match;
 
 pub use self::{
-    find::find,
+    find::{Match, find},
     gmatch::gmatch,
     gsub::{Repl, gsub},
     r#match::r#match,

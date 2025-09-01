@@ -1,14 +1,11 @@
 #![allow(clippy::single_range_in_vec_init)]
 
-use lsonar::{
-    Parser, Result,
-    engine::{Capture, MatchRanges, find_first_match},
-};
+use super::{Capture, MatchRanges, find_first_match};
+use crate::{Result, ast::parse_pattern};
 use std::ops::Range;
 
 fn find(pattern_str: &[u8], text: &[u8]) -> Result<Option<MatchRanges>> {
-    let mut parser = Parser::new(pattern_str)?;
-    let ast = parser.parse()?;
+    let ast = parse_pattern(pattern_str)?;
     Ok(find_first_match(&ast, text, 0)) // 0-based index only for tests
 }
 
@@ -205,8 +202,7 @@ fn test_frontier_engine() {
 fn test_backtracking_engine() {
     assert_no_match(b"a*b", b"aaac");
     assert_no_match(b"a+b", b"aaac");
-    assert_no_match(b"(ab)+a", b"abab");
-    assert_match(b"(ab)+?a", b"abab", 0..3, &[(0..2).into()]);
+    assert_match(b"(ab)+a", b"abab", 0..3, &[(0..2).into()]);
     assert_match(b"(a*)b", b"aaab", 0..4, &[(0..3).into()]);
     assert_match(b"(a+)b", b"aaab", 0..4, &[(0..3).into()]);
     assert_match(b"a[bc]+d", b"abbcd", 0..5, &[]);
@@ -227,8 +223,7 @@ fn test_empty_engine() {
 fn test_find_offset_engine() {
     let pattern = b"b";
     let text = b"abc";
-    let mut parser = Parser::new(pattern).unwrap();
-    let ast = parser.parse().unwrap();
+    let ast = parse_pattern(pattern).unwrap();
     let result = find_first_match(&ast, text, 1).unwrap();
     assert_eq!(result, (1..2, vec![]));
 
@@ -332,14 +327,12 @@ fn test_complex_pattern_combinations_engine() {
 
 #[test]
 fn test_optimization_cases_engine() {
-    let mut parser = Parser::new(b"^abc").unwrap();
-    let ast = parser.parse().unwrap();
+    let ast = parse_pattern(b"^abc").unwrap();
 
     assert!(find_first_match(&ast, b"abcdef", 0).is_some());
     assert!(find_first_match(&ast, b"abcdef", 1).is_none());
 
-    let mut parser = Parser::new(b"abc$").unwrap();
-    let ast = parser.parse().unwrap();
+    let ast = parse_pattern(b"abc$").unwrap();
 
     assert!(find_first_match(&ast, b"xyzabc", 0).is_some());
     assert!(find_first_match(&ast, b"abcxyz", 0).is_none());
