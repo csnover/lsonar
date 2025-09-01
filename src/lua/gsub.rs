@@ -5,6 +5,7 @@ mod repl;
 
 use crate::engine::MatchRanges;
 pub use repl::Repl;
+use std::borrow::Cow;
 
 /// Corresponds to Lua 5.3 `string.gsub`
 pub fn gsub<'a>(
@@ -37,22 +38,22 @@ pub fn gsub<'a>(
             Repl::String(repl_str) => {
                 let captures_str = captures
                     .into_iter()
-                    .map(|range| &text[range])
+                    .map(|range| range.into_bytes(text))
                     .collect::<Vec<_>>();
                 let replacement = process_replacement_string(repl_str, &captures_str);
                 result.extend(&replacement);
             }
             Repl::Function(f) => {
-                let args = core::iter::once(full_match)
-                    .chain(captures.into_iter().map(|range| &text[range]))
+                let args = core::iter::once(Cow::Borrowed(full_match))
+                    .chain(captures.into_iter().map(|range| range.into_bytes(text)))
                     .collect::<Vec<_>>();
                 let replacement = f(&args);
                 result.extend(&replacement);
             }
             Repl::Table(f) => {
-                let key = captures
-                    .first()
-                    .map_or(full_match, |range| &text[range.clone()]);
+                let key = captures.first().map_or(Cow::Borrowed(full_match), |range| {
+                    range.clone().into_bytes(text)
+                });
 
                 if let Some(replacement) = f(key) {
                     result.extend(replacement);

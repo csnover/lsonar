@@ -53,7 +53,7 @@ fn test_combined_pattern_captures() {
 fn test_empty_captures() {
     assert_eq!(
         r#match(b"hello", b"(h)()ello", None),
-        Ok(vec![b"h".into(), b"".into()])
+        Ok(vec![b"h".into(), b"2".into()])
     );
 }
 

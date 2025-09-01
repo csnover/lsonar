@@ -89,7 +89,7 @@ fn test_function_replacement() {
         gsub(
             b"hello world",
             b"%w+",
-            Repl::Function(&|captures: &[&[u8]]| { captures[0].to_ascii_uppercase() }),
+            Repl::Function(&|captures| { captures[0].to_ascii_uppercase() }),
             None
         ),
         Ok((b"HELLO WORLD".to_vec(), 2))
@@ -102,11 +102,15 @@ fn test_function_with_captures() {
         gsub(
             b"a=1, b=2, c=3",
             b"(%w)=(%d)",
-            Repl::Function(&|captures: &[&[u8]]| {
+            Repl::Function(&|captures| {
                 format!(
                     "{}={}",
-                    str::from_utf8(captures[1]).unwrap(),
-                    str::from_utf8(captures[2]).unwrap().parse::<i32>().unwrap() * 2
+                    str::from_utf8(captures[1].as_ref()).unwrap(),
+                    str::from_utf8(captures[2].as_ref())
+                        .unwrap()
+                        .parse::<i32>()
+                        .unwrap()
+                        * 2
                 )
                 .as_bytes()
                 .to_vec()
@@ -127,7 +131,7 @@ fn test_table_replacement() {
         gsub(
             b"hello world",
             b"%w+",
-            Repl::Table(&|key| table.get(key).map(|v| v.to_vec())),
+            Repl::Table(&|key| table.get(key.as_ref()).map(|v| v.to_vec())),
             None
         ),
         Ok(("привет мир".as_bytes().to_vec(), 2))
@@ -143,7 +147,7 @@ fn test_partial_table_replacement() {
         gsub(
             b"hello world",
             b"%w+",
-            Repl::Table(&|key| table.get(key).map(|v| v.to_vec())),
+            Repl::Table(&|key| table.get(key.as_ref()).map(|v| v.to_vec())),
             None
         ),
         Ok(("привет world".as_bytes().to_vec(), 2))
@@ -160,7 +164,7 @@ fn test_table_with_captures() {
         gsub(
             b"name=John age=25",
             b"(%w+)=%w+",
-            Repl::Table(&|key| table.get(key).map(|v| v.to_vec())),
+            Repl::Table(&|key| table.get(key.as_ref()).map(|v| v.to_vec())),
             None
         ),
         Ok(("имя возраст".as_bytes().to_vec(), 2))

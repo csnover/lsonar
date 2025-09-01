@@ -47,7 +47,7 @@ impl<'a> Iterator for GMatchIterator<'a> {
                 } else {
                     captures
                         .into_iter()
-                        .map(|range| Cow::Borrowed(&self.bytes[range]))
+                        .map(|range| range.into_bytes(self.bytes))
                         .collect()
                 })
             },

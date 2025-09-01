@@ -26,7 +26,7 @@ pub fn r#match<'a>(text: &'a [u8], pattern: &[u8], init: Option<isize>) -> Resul
             if has_captures {
                 captures
                     .into_iter()
-                    .map(|range| Cow::Borrowed(&text[range]))
+                    .map(|range| range.into_bytes(text))
                     .collect()
             } else {
                 vec![Cow::Borrowed(&text[full_match])]

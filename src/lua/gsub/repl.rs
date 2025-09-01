@@ -1,5 +1,7 @@
-type Key<'a> = &'a [u8];
-type Captures<'a> = &'a [&'a [u8]];
+use std::borrow::Cow;
+
+type Key<'a> = Cow<'a, [u8]>;
+type Captures<'a> = &'a [Cow<'a, [u8]>];
 
 /// String replacement strategy.
 #[derive(Clone, Copy)]
@@ -23,7 +25,7 @@ enum ReplToken {
     CaptureRef(usize),
 }
 
-pub fn process_replacement_string(repl: &[u8], captures: &[&[u8]]) -> Vec<u8> {
+pub fn process_replacement_string(repl: &[u8], captures: &[Cow<'_, [u8]>]) -> Vec<u8> {
     let tokens = tokenize_replacement_string(repl);
     let mut result = Vec::with_capacity(tokens.len());
 
@@ -34,7 +36,7 @@ pub fn process_replacement_string(repl: &[u8], captures: &[&[u8]]) -> Vec<u8> {
             }
             ReplToken::CaptureRef(idx) => {
                 if idx <= captures.len() {
-                    result.extend(captures[idx - 1]);
+                    result.extend(captures[idx - 1].as_ref());
                 }
             }
         }

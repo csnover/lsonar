@@ -1,5 +1,4 @@
-use std::ops::Range;
-
+use super::Capture;
 use crate::LUA_MAXCAPTURES;
 
 #[derive(Clone)]
@@ -7,7 +6,7 @@ pub struct State<'a> {
     pub input: &'a [u8],
     pub current_pos: usize,
     pub search_start_pos: usize,
-    pub captures: [Range<usize>; LUA_MAXCAPTURES],
+    pub captures: [Capture; LUA_MAXCAPTURES],
     pub recursion_depth: u32,
 }
 

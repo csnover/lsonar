@@ -1,9 +1,61 @@
-use std::ops::Range;
+use std::{borrow::Cow, ops::Range};
 
 use super::ast::{AstNode, AstRoot, Quantifier};
 use state::{MAX_RECURSION_DEPTH, State};
 
 mod state;
+
+/// A capture group.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Capture {
+    /// A substring capture group.
+    Range(Range<usize>),
+    /// A current string position capture group.
+    Position(usize),
+}
+
+impl Capture {
+    #[must_use]
+    pub fn into_bytes(self, text: &[u8]) -> Cow<'_, [u8]> {
+        match self {
+            Capture::Range(range) => Cow::Borrowed(&text[range]),
+            Capture::Position(at) => Cow::Owned(
+                format!(
+                    "{}",
+                    if cfg!(feature = "1-based") {
+                        at.saturating_add(1)
+                    } else {
+                        at
+                    }
+                )
+                .into_bytes(),
+            ),
+        }
+    }
+}
+
+impl Default for Capture {
+    fn default() -> Self {
+        Self::Range(<_>::default())
+    }
+}
+
+// TODO: This is only required for unit tests.
+impl From<Range<usize>> for Capture {
+    fn from(value: Range<usize>) -> Self {
+        Self::Range(value)
+    }
+}
+
+// TODO: This is only required for unit tests.
+impl PartialEq<Range<usize>> for Capture {
+    fn eq(&self, other: &Range<usize>) -> bool {
+        match self {
+            Capture::Range(range) => range == other,
+            Capture::Position(_) => false,
+        }
+    }
+}
 
 /// The ranged indexes of a matched pattern. These are always 0-indexed.
 #[derive(Debug, Eq, PartialEq)]
@@ -12,13 +64,13 @@ pub struct MatchRanges {
     pub full_match: Range<usize>,
     /// The ranges of each captured group. If a group did not capture anything,
     /// the range will be empty.
-    pub captures: Vec<Range<usize>>,
+    pub captures: Vec<Capture>,
 }
 
 // TODO: This exists only to avoid having to spend a bunch of time changing the
 // unit tests
-impl PartialEq<(Range<usize>, Vec<Range<usize>>)> for MatchRanges {
-    fn eq(&self, other: &(Range<usize>, Vec<Range<usize>>)) -> bool {
+impl PartialEq<(Range<usize>, Vec<Capture>)> for MatchRanges {
+    fn eq(&self, other: &(Range<usize>, Vec<Capture>)) -> bool {
         self.full_match == other.0 && self.captures == other.1
     }
 }
@@ -135,8 +187,11 @@ fn match_recursive<'a>(ast: &[AstNode], mut state: State<'a>) -> Option<State<'a
             let capture_index = *index - 1; // 0-based for [`Vec`] index
 
             if let Some(mut success_state) = match_recursive(inner, state.clone()) {
-                let capture_range = start_pos..success_state.current_pos;
-                success_state.captures[capture_index] = capture_range;
+                success_state.captures[capture_index] = if inner.is_empty() {
+                    Capture::Position(start_pos)
+                } else {
+                    Capture::Range(start_pos..success_state.current_pos)
+                };
 
                 if let Some(final_state) = match_recursive(remaining_ast, success_state) {
                     return Some(final_state);

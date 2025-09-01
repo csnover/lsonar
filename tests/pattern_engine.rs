@@ -2,7 +2,7 @@
 
 use lsonar::{
     Parser, Result,
-    engine::{MatchRanges, find_first_match},
+    engine::{Capture, MatchRanges, find_first_match},
 };
 use std::ops::Range;
 
@@ -17,7 +17,7 @@ fn assert_match(
     pattern: &[u8],
     text: &[u8],
     expected_full: Range<usize>,
-    expected_captures: &[Range<usize>],
+    expected_captures: &[Capture],
 ) {
     let result = find(pattern, text).expect("find failed");
     match result {
@@ -144,33 +144,38 @@ fn test_non_greedy_quantifier_engine() {
 
 #[test]
 fn test_captures_simple_engine() {
-    assert_match(b"(a)", b"a", 0..1, &[(0..1)]);
-    assert_match(b"(.)", b"b", 0..1, &[(0..1)]);
-    assert_match(b"(%d)", b"3", 0..1, &[(0..1)]);
-    assert_match(b"a(b)c", b"abc", 0..3, &[(1..2)]);
-    assert_match(b"a(.)c", b"axc", 0..3, &[(1..2)]);
-    assert_match(b"(a)(b)", b"ab", 0..2, &[(0..1), (1..2)]);
-    assert_match(b"()(b)", b"b", 0..1, &[(0..0), (0..1)]);
+    assert_match(b"(a)", b"a", 0..1, &[(0..1).into()]);
+    assert_match(b"(.)", b"b", 0..1, &[(0..1).into()]);
+    assert_match(b"(%d)", b"3", 0..1, &[(0..1).into()]);
+    assert_match(b"a(b)c", b"abc", 0..3, &[(1..2).into()]);
+    assert_match(b"a(.)c", b"axc", 0..3, &[(1..2).into()]);
+    assert_match(b"(a)(b)", b"ab", 0..2, &[(0..1).into(), (1..2).into()]);
+    assert_match(
+        b"()(b)",
+        b"b",
+        0..1,
+        &[Capture::Position(0), Capture::Range(0..1)],
+    );
 }
 
 #[test]
 fn test_captures_quantified_engine() {
-    assert_match(b"(a)*", b"aaa", 0..3, &[(2..3)]);
-    assert_match(b"(a)+", b"aaa", 0..3, &[(2..3)]);
-    assert_match(b"(a)?", b"a", 0..1, &[(0..1)]);
+    assert_match(b"(a)*", b"aaa", 0..3, &[(2..3).into()]);
+    assert_match(b"(a)+", b"aaa", 0..3, &[(2..3).into()]);
+    assert_match(b"(a)?", b"a", 0..1, &[(0..1).into()]);
     assert_match(b"(a)?", b"", 0..0, &[<_>::default()]);
-    assert_match(b"a(b)*c", b"abbbc", 0..5, &[(3..4)]);
-    assert_match(b"a(b)+c", b"abbbc", 0..5, &[(3..4)]);
-    assert_match(b"a(b)?c", b"abc", 0..3, &[(1..2)]);
+    assert_match(b"a(b)*c", b"abbbc", 0..5, &[(3..4).into()]);
+    assert_match(b"a(b)+c", b"abbbc", 0..5, &[(3..4).into()]);
+    assert_match(b"a(b)?c", b"abc", 0..3, &[(1..2).into()]);
     assert_match(b"a(b)?c", b"ac", 0..2, &[<_>::default()]);
-    assert_match(b"a(b)-c", b"abbbc", 0..5, &[(3..4)]);
-    assert_match(b"a(b)-c", b"abbbc", 0..5, &[(3..4)]);
+    assert_match(b"a(b)-c", b"abbbc", 0..5, &[(3..4).into()]);
+    assert_match(b"a(b)-c", b"abbbc", 0..5, &[(3..4).into()]);
 }
 
 #[test]
 fn test_captures_nested_engine() {
-    assert_match(b"(a(b)c)", b"abc", 0..3, &[(0..3), (1..2)]);
-    assert_match(b"((.)%w*)", b"a1 b2", 0..2, &[(0..2), (0..1)]);
+    assert_match(b"(a(b)c)", b"abc", 0..3, &[(0..3).into(), (1..2).into()]);
+    assert_match(b"((.)%w*)", b"a1 b2", 0..2, &[(0..2).into(), (0..1).into()]);
 }
 
 #[test]
@@ -200,9 +205,9 @@ fn test_frontier_engine() {
 fn test_backtracking_engine() {
     assert_no_match(b"a*b", b"aaac");
     assert_no_match(b"a+b", b"aaac");
-    assert_match(b"(ab)+a", b"abab", 0..3, &[0..2]);
-    assert_match(b"(a*)b", b"aaab", 0..4, &[(0..3)]);
-    assert_match(b"(a+)b", b"aaab", 0..4, &[(0..3)]);
+    assert_match(b"(ab)+a", b"abab", 0..3, &[(0..2).into()]);
+    assert_match(b"(a*)b", b"aaab", 0..4, &[(0..3).into()]);
+    assert_match(b"(a+)b", b"aaab", 0..4, &[(0..3).into()]);
     assert_match(b"a[bc]+d", b"abbcd", 0..5, &[]);
 }
 
@@ -214,7 +219,7 @@ fn test_empty_engine() {
     assert_match(b"a*", b"", 0..0, &[]);
     assert_no_match(b"a+", b"");
     assert_match(b"a?", b"", 0..0, &[]);
-    assert_match(b"()", b"", 0..0, &[(0..0)]);
+    assert_match(b"()", b"", 0..0, &[Capture::Position(0)]);
 }
 
 #[test]
@@ -351,24 +356,29 @@ fn test_pattern_with_utf8_content_engine() {
 
 #[test]
 fn test_quantifiers_with_capturing_groups_engine() {
-    assert_match(b"(a)+", b"aaa", 0..3, &[(2..3)]);
-    assert_match(b"(ab)+", b"ababab", 0..6, &[(4..6)]);
-    assert_match(b"(a)*", b"aaa", 0..3, &[(2..3)]);
-    assert_match(b"(a)*", b"", 0..0, &[(0..0)]);
-    assert_match(b"(a)?", b"a", 0..1, &[(0..1)]);
-    assert_match(b"(a)?", b"", 0..0, &[(0..0)]);
-    assert_match(b"(a)-", b"aaa", 0..0, &[(0..0)]);
+    assert_match(b"(a)+", b"aaa", 0..3, &[(2..3).into()]);
+    assert_match(b"(ab)+", b"ababab", 0..6, &[(4..6).into()]);
+    assert_match(b"(a)*", b"aaa", 0..3, &[(2..3).into()]);
+    assert_match(b"(a)*", b"", 0..0, &[(0..0).into()]);
+    assert_match(b"(a)?", b"a", 0..1, &[(0..1).into()]);
+    assert_match(b"(a)?", b"", 0..0, &[(0..0).into()]);
+    assert_match(b"(a)-", b"aaa", 0..0, &[(0..0).into()]);
 }
 
 #[test]
 fn test_edge_cases_and_backtracking_engine() {
-    assert_match(b"(a+)+", b"aaa", 0..3, &[(0..3)]);
+    assert_match(b"(a+)+", b"aaa", 0..3, &[(0..3).into()]);
     assert_match(b"[ab][cd]", b"ac", 0..2, &[]);
     assert_match(b"[ab][cd]", b"bd", 0..2, &[]);
     assert_no_match(b"[ab][cd]", b"ab");
     assert_match(b"a.-b", b"axxxbyyybzzz", 0..5, &[]);
     assert_match(b"a.*b", b"axxxbyyybzzz", 0..9, &[]);
-    assert_match(b"(a*)(b?)b+", b"aaabbb", 0..6, &[(0..3), (3..4)]);
+    assert_match(
+        b"(a*)(b?)b+",
+        b"aaabbb",
+        0..6,
+        &[(0..3).into(), (3..4).into()],
+    );
 }
 
 #[test]
@@ -410,13 +420,13 @@ fn test_subsequent_captures_engine() {
         b"(%d%d%d%d)%-(%d%d)%-(%d%d)",
         b"2023-04-15",
         0..10,
-        &[(0..4), (5..7), (8..10)],
+        &[(0..4).into(), (5..7).into(), (8..10).into()],
     );
 
     assert_match(
         b"(%d+)_(%w+)_(%d+)",
         b"123_test_456",
         0..12,
-        &[(0..3), (4..8), (9..12)],
+        &[(0..3).into(), (4..8).into(), (9..12).into()],
     );
 }

@@ -57,7 +57,7 @@ fn test_single_char_captures() {
 fn test_empty_captures() {
     assert_eq!(
         collect_gmatch_results(b"abc", b"()a()"),
-        Ok(vec![vec![b"".into(), b"".into()]])
+        Ok(vec![vec![b"1".into(), b"2".into()]])
     );
 }
 

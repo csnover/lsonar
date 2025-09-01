@@ -3,7 +3,6 @@ use crate::{
     Parser, Result,
     engine::{MatchRanges, find_first_match},
 };
-use std::borrow::Cow;
 
 /// The indices and optional captures of a found string.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -97,7 +96,7 @@ pub fn find<'a>(
                 end: full_match.end,
                 captures: captures
                     .into_iter()
-                    .map(|range| Cow::Borrowed(&text_bytes[range]))
+                    .map(|range| range.into_bytes(text_bytes))
                     .collect(),
             })),
             None => Ok(None),
