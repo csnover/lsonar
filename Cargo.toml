@@ -9,6 +9,7 @@ repository = "https://github.com/reloginn/lsonar"
 rust-version = "1.88"
 
 [dependencies]
+thiserror = "2.0.16"
 
 [features]
 default = ["1-based"]

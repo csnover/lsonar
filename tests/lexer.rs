@@ -4,10 +4,10 @@ use lsonar::{
 };
 
 fn lex_all(input: &[u8]) -> Result<Vec<Token>> {
-    let mut lexer = Lexer::new(input);
+    let mut lexer = Lexer::new(input)?;
     let mut tokens = Vec::new();
-    while let Some(token_result) = lexer.next_token()? {
-        tokens.push(token_result);
+    while let Some(token_result) = lexer.next()? {
+        tokens.push(token_result.token);
     }
     Ok(tokens)
 }
@@ -138,9 +138,18 @@ fn test_mixed_tokens_lexer() -> Result<()> {
 
 #[test]
 fn test_lexer_throw_errors() {
-    assert!(matches!(lex_all(b"%"), Err(Error::Lexer(_))));
-    assert!(matches!(lex_all(b"%q"), Err(Error::Lexer(_))));
-    assert!(matches!(lex_all(b"abc%"), Err(Error::Lexer(_))));
+    assert!(matches!(
+        lex_all(b"%"),
+        Err(Error::UnexpectedEnd { pos: 1 })
+    ));
+    assert!(matches!(
+        lex_all(b"%q"),
+        Err(Error::UnknownClass { pos: 0, lit: b'q' })
+    ));
+    assert!(matches!(
+        lex_all(b"abc%"),
+        Err(Error::UnexpectedEnd { pos: 4 })
+    ));
 }
 
 #[test]

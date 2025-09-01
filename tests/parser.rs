@@ -1,5 +1,6 @@
-use lsonar::charset::CharSet;
-use lsonar::{AstNode, AstRoot, Error, LUA_MAXCAPTURES, Parser, Quantifier, Result};
+use lsonar::{
+    AstNode, AstRoot, CharSet, Error, LUA_MAXCAPTURES, Parser, Quantifier, Result, Token,
+};
 
 fn parse_ok(pattern: &[u8]) -> AstRoot {
     Parser::new(pattern)
@@ -14,8 +15,7 @@ fn parse_ok(pattern: &[u8]) -> AstRoot {
 }
 
 fn parse_err(pattern: &[u8]) -> Result<AstRoot> {
-    let mut parser = Parser::new(pattern)?;
-    parser.parse()
+    Parser::new(pattern)?.parse()
 }
 
 fn quantified(item: AstNode, quantifier: Quantifier) -> AstNode {
@@ -298,45 +298,94 @@ fn test_escaped_rparen_rbracket_without_panic() {
 
 #[test]
 fn test_throw_parser_errors() {
-    assert!(
-        matches!(parse_err(b"("), Err(Error::Parser(s)) if s.contains("malformed pattern (unexpected end, expected RParen)"))
-    );
-    assert!(matches!(parse_err(b")"), Err(Error::Parser(s)) if s.contains("unexpected ')'")));
-    assert!(matches!(parse_err(b"]"), Err(Error::Parser(s)) if s.contains("unexpected ']'")));
-    assert!(
-        matches!(parse_err(b"["), Err(Error::Parser(s)) if s.contains("unfinished character class"))
-    );
-    assert!(matches!(parse_err(b"*"), Err(Error::Parser(s)) if s.contains("must follow an item")));
-    assert!(
-        matches!(parse_err(b"^*"), Err(Error::Parser(s)) if s.contains("cannot be quantified"))
-    );
-    assert!(
-        matches!(parse_err(b"$+"), Err(Error::Parser(s)) if s.contains("cannot be quantified"))
-    );
-    assert!(matches!(parse_err(b"%b"), Err(Error::Lexer(s)) if s.contains("needs two characters")));
-    assert!(
-        matches!(parse_err(b"%bx"), Err(Error::Lexer(s)) if s.contains("needs two characters"))
-    );
-    assert!(
-        matches!(parse_err(b"%f"), Err(Error::Parser(s)) if s.contains("missing '[' after %f"))
-    );
-    assert!(
-        matches!(parse_err(b"%fa"), Err(Error::Parser(s)) if s.contains("missing '[' after %f"))
-    );
-    assert!(
-        matches!(parse_err(b"%f["), Err(Error::Parser(s)) if s.contains("unfinished character class"))
-    );
-    assert!(
-        matches!(parse_err(b"%f[a"), Err(Error::Parser(s)) if s.contains("unfinished character class"))
-    );
-    assert!(matches!(parse_err(b"%z"), Err(Error::Lexer(_))));
+    assert!(matches!(
+        parse_err(b"xxxx("),
+        Err(Error::ExpectedToken {
+            pos: 5,
+            expected: Token::RParen,
+            actual: None
+        })
+    ));
+    assert!(matches!(
+        parse_err(b"xx)"),
+        Err(Error::UnexpectedToken { lit: b')', pos: 2 })
+    ));
+    assert!(matches!(
+        parse_err(b"x]"),
+        Err(Error::UnexpectedToken { lit: b']', pos: 1 })
+    ));
+    assert!(matches!(
+        parse_err(b"["),
+        Err(Error::ExpectedToken {
+            pos: 1,
+            expected: Token::RBracket,
+            actual: None
+        })
+    ));
+    assert!(matches!(
+        parse_err(b"*"),
+        Err(Error::UnexpectedToken { lit: b'*', pos: 0 })
+    ));
+    assert!(matches!(
+        parse_err(b"^*"),
+        Err(Error::UnexpectedToken { pos: 1, lit: b'*' })
+    ));
+    assert!(matches!(
+        parse_err(b"$+"),
+        Err(Error::UnexpectedToken { pos: 1, lit: b'+' })
+    ));
+    assert!(matches!(
+        parse_err(b"%b"),
+        Err(Error::MissingArgs { pos: 2 })
+    ));
+    assert!(matches!(
+        parse_err(b"%bx"),
+        Err(Error::MissingArgs { pos: 3 })
+    ));
+    assert!(matches!(
+        parse_err(b"%f"),
+        Err(Error::ExpectedToken {
+            pos: 2,
+            expected: Token::LBracket,
+            actual: None
+        })
+    ));
+    assert!(matches!(
+        parse_err(b"%fa"),
+        Err(Error::ExpectedToken {
+            pos: 2,
+            expected: Token::LBracket,
+            actual: Some(Token::Literal(b'a'))
+        })
+    ));
+    assert!(matches!(
+        parse_err(b"%f["),
+        Err(Error::ExpectedToken {
+            pos: 3,
+            expected: Token::RBracket,
+            actual: None
+        })
+    ));
+    assert!(matches!(
+        parse_err(b"%f[a"),
+        Err(Error::ExpectedToken {
+            pos: 4,
+            expected: Token::RBracket,
+            actual: None
+        })
+    ));
+    assert!(matches!(
+        parse_err(b"%z"),
+        Err(Error::UnknownClass { pos: 0, lit: b'z' })
+    ));
 
     assert_eq!(parse_ok(b"%1"), &[AstNode::CaptureRef(1)]);
 
     let too_many_captures = "()".repeat(LUA_MAXCAPTURES + 1);
-    assert!(
-        matches!(parse_err(too_many_captures.as_bytes()), Err(Error::Parser(s)) if s.contains("too many captures"))
-    );
+    assert!(matches!(
+        parse_err(too_many_captures.as_bytes()),
+        Err(Error::Captures(c)) if c == LUA_MAXCAPTURES + 1
+    ));
 }
 
 #[test]

@@ -1,5 +1,12 @@
-use super::{Error, Result};
 use std::ops::Bound;
+
+#[derive(Debug, thiserror::Error, PartialEq)]
+pub enum Error {
+    #[error("invalid range ({0} > {1})")]
+    Range(u8, u8),
+    #[error("invalid byte class '%{}'", _0.escape_ascii())]
+    ByteClass(u8),
+}
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct CharSet {
@@ -30,14 +37,13 @@ impl CharSet {
         self.bytes[b as usize] = true;
     }
 
-    pub fn add_range(&mut self, start: u8, end: u8) -> Result<()> {
-        if start > end {
-            return Err(Error::Parser(
-                "invalid range in character class".to_string(),
-            ));
+    pub fn add_range(&mut self, start: u8, end: u8) -> Result<(), Error> {
+        if start <= end {
+            self.bytes[to_usize(start..=end)].fill(true);
+            Ok(())
+        } else {
+            Err(Error::Range(start, end))
         }
-        self.bytes[to_usize(start..=end)].fill(true);
-        Ok(())
     }
 
     #[inline]
@@ -59,7 +65,7 @@ impl CharSet {
         }
     }
 
-    pub fn add_class(&mut self, class_byte: u8) -> Result<()> {
+    pub fn add_class(&mut self, class_byte: u8) -> Result<(), Error> {
         let invert = class_byte.is_ascii_uppercase();
         match class_byte.to_ascii_lowercase() {
             b'a' => {
@@ -105,9 +111,7 @@ impl CharSet {
                 self.fill([b'0', b'9' + 1, b'A', b'F' + 1, b'a', b'f' + 1], invert);
             }
             _ => {
-                return Err(Error::Parser(format!(
-                    "invalid byte class '%{class_byte:?}'"
-                )));
+                return Err(Error::ByteClass(class_byte));
             }
         }
 

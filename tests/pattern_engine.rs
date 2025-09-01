@@ -205,7 +205,8 @@ fn test_frontier_engine() {
 fn test_backtracking_engine() {
     assert_no_match(b"a*b", b"aaac");
     assert_no_match(b"a+b", b"aaac");
-    assert_match(b"(ab)+a", b"abab", 0..3, &[(0..2).into()]);
+    assert_no_match(b"(ab)+a", b"abab");
+    assert_match(b"(ab)+?a", b"abab", 0..3, &[(0..2).into()]);
     assert_match(b"(a*)b", b"aaab", 0..4, &[(0..3).into()]);
     assert_match(b"(a+)b", b"aaab", 0..4, &[(0..3).into()]);
     assert_match(b"a[bc]+d", b"abbcd", 0..5, &[]);
