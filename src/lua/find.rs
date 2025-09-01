@@ -32,7 +32,7 @@ impl<'a> From<(usize, usize, Captures<'a>)> for Match<'a> {
 }
 
 /// Corresponds to Lua 5.3 [`string.find`].
-/// Returns 1-based or 0-based (see features [`1-based`] and [`0-based`]) indices (start, end) and captured strings. The [`init`] argument can be either 0-based or 1-based.
+/// Returns 1-based or 0-based (see features [`1-based`] and [`0-based`]) indices (start, end) and captured strings. The `init` argument can be either 0-based or 1-based.
 pub fn find<'a>(
     text_bytes: &'a [u8],
     pattern: &[u8],
