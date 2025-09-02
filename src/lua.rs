@@ -6,7 +6,7 @@ mod r#match;
 pub use self::{
     find::{Match, find},
     gmatch::gmatch,
-    gsub::{Repl, gsub},
+    gsub::{GSub, Repl, gsub},
     r#match::r#match,
 };
 pub use std::borrow::Cow;
