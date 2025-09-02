@@ -65,11 +65,16 @@ impl GSub {
         }
     }
 
-    /// Replaces the current match with the given replacement text.
-    pub fn replace(&mut self, input: &[u8], replacement: &[u8]) {
+    /// Replaces the current match with the given replacement text. If the given
+    /// replacement is `None`, the original match is kept in the string.
+    pub fn replace(&mut self, input: &[u8], replacement: Option<&[u8]>) {
         self.result
             .extend(&input[self.last_pos..self.current.start]);
-        self.result.extend(replacement);
+        if let Some(replacement) = replacement {
+            self.result.extend(replacement);
+        } else {
+            self.result.extend(&input[self.current.clone()]);
+        }
 
         self.last_pos = self.current.end;
 
@@ -104,17 +109,15 @@ pub fn gsub<'a>(
     let mut generator = GSub::new(pattern, n)?;
     while let Some(captures) = generator.next(s) {
         let replacement = match repl {
-            Repl::String(repl_str) => {
-                Cow::Owned(process_replacement_string(repl_str, &captures[1..]))
-            }
-            Repl::Function(f) => Cow::Owned(f(&captures)),
+            Repl::String(repl_str) => Some(process_replacement_string(repl_str, &captures[1..])),
+            Repl::Function(f) => f(&captures),
             Repl::Table(f) => {
                 let full_match = captures[0].clone();
                 let key = captures.get(1).cloned().unwrap_or(full_match.clone());
-                f(key).map_or(full_match, Cow::Owned)
+                f(key)
             }
         };
-        generator.replace(s, &replacement);
+        generator.replace(s, replacement.as_deref());
     }
 
     Ok(generator.finish(s))

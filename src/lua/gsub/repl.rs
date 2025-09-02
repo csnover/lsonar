@@ -14,7 +14,7 @@ pub enum Repl<'a> {
     String(&'a [u8]),
     /// This function is called every time a match occurs, with all captured
     /// substrings passed as a slice, in order.
-    Function(&'a dyn Fn(Captures<'_>) -> Vec<u8>),
+    Function(&'a dyn Fn(Captures<'_>) -> Option<Vec<u8>>),
     /// This function is queried for every match, using the first capture as the
     /// key.
     Table(&'a dyn Fn(Key<'_>) -> Option<Vec<u8>>),
