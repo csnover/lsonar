@@ -4,7 +4,7 @@ pub use super::parser::parse_pattern;
 use crate::charset::CharSet;
 
 /// A syntax tree node.
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AstNode {
     /// A literal character.
     Literal(u8),

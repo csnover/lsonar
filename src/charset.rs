@@ -3,7 +3,7 @@
 use std::ops::Bound;
 
 /// The error type used by [`CharSet`].
-#[derive(Debug, thiserror::Error, PartialEq)]
+#[derive(Debug, Eq, thiserror::Error, PartialEq)]
 pub enum Error {
     /// An invalid range was given.
     #[error("invalid range ({0} > {1})")]

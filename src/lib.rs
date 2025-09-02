@@ -13,7 +13,7 @@ mod parser;
 pub use self::lua::{GSub, Match, Repl, find, gmatch, gsub, r#match};
 
 /// A pattern string parsing error.
-#[derive(Debug, thiserror::Error, PartialEq)]
+#[derive(Debug, Eq, thiserror::Error, PartialEq)]
 pub enum Error {
     /// The pattern contains an invalid character set range or byte class.
     #[error("{err} at {pos}")]
