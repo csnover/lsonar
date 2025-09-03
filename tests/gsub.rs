@@ -89,7 +89,7 @@ fn test_function_replacement() {
         gsub(
             b"hello world",
             b"%w+",
-            Repl::Function(&|captures| { captures.first().map(|s| s.to_ascii_uppercase()) }),
+            Repl::Function(&mut |captures| { captures.first().map(|s| s.to_ascii_uppercase()) }),
             None
         ),
         Ok((b"HELLO WORLD".to_vec(), 2))
@@ -102,7 +102,7 @@ fn test_function_with_captures() {
         gsub(
             b"a=1, b=2, c=3",
             b"(%w)=(%d)",
-            Repl::Function(&|captures| {
+            Repl::Function(&mut |captures| {
                 Some(
                     format!(
                         "{}={}",

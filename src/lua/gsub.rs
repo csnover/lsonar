@@ -103,12 +103,12 @@ impl GSub {
 pub fn gsub<'a>(
     s: &'a [u8],
     pattern: &[u8],
-    repl: Repl<'a>,
+    mut repl: Repl<'a>,
     n: Option<usize>,
 ) -> Result<(Vec<u8>, usize)> {
     let mut generator = GSub::new(pattern, n)?;
     while let Some(captures) = generator.next(s) {
-        let replacement = match repl {
+        let replacement = match &mut repl {
             Repl::String(repl_str) => Some(process_replacement_string(repl_str, &captures[1..])),
             Repl::Function(f) => f(&captures),
             Repl::Table(f) => {
