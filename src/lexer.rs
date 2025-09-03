@@ -303,12 +303,10 @@ fn is_class_byte(c: u8) -> bool {
             | b'U'
             | b'W'
             | b'X'
+            | b'Z'
     )
 }
 
 fn is_escapable_magic_byte(c: u8) -> bool {
-    matches!(
-        c,
-        b'(' | b')' | b'.' | b'%' | b'[' | b']' | b'*' | b'+' | b'-' | b'?' | b'^' | b'$'
-    )
+    !c.is_ascii_alphanumeric()
 }
