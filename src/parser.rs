@@ -119,8 +119,16 @@ impl<'a> Parser<'a> {
             | Token::Literal(_)
             | Token::EscapedLiteral(_) => Ok(AstNode::Literal(token.to_byte())),
             Token::Any => Ok(AstNode::Any),
-            Token::Caret => Ok(AstNode::AnchorStart),
-            Token::Dollar => Ok(AstNode::AnchorEnd),
+            Token::Caret => Ok(if pos == 0 {
+                AstNode::AnchorStart
+            } else {
+                AstNode::Literal(token.to_byte())
+            }),
+            Token::Dollar => Ok(if self.lexer.peek().is_none() {
+                AstNode::AnchorEnd
+            } else {
+                AstNode::Literal(token.to_byte())
+            }),
             Token::Class(c) => {
                 let negated = c.is_ascii_uppercase();
                 let base_byte = if negated { c.to_ascii_lowercase() } else { c };

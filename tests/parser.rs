@@ -321,10 +321,6 @@ fn test_throw_parser_errors() {
         Err(Error::UnexpectedToken { pos: 1, lit: b'*' })
     ));
     assert!(matches!(
-        parse_pattern(b"$+"),
-        Err(Error::UnexpectedToken { pos: 1, lit: b'+' })
-    ));
-    assert!(matches!(
         parse_pattern(b"%b"),
         Err(Error::MissingArgs { pos: 2 })
     ));
