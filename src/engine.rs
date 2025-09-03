@@ -297,11 +297,9 @@ impl<'a> State<'a> {
 
     #[inline]
     fn previous_byte(&self) -> Option<u8> {
-        if self.current_pos > 0 {
-            self.input.get(self.current_pos - 1).copied()
-        } else {
-            None
-        }
+        self.current_pos
+            .checked_sub(1)
+            .and_then(|pos| self.input.get(pos).copied())
     }
 
     #[inline]
