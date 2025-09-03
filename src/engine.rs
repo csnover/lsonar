@@ -128,12 +128,9 @@ fn match_recursive<'a>(ast: &[AstNode], mut state: State<'a>) -> Option<State<'a
     }
     state.recursion_depth += 1;
 
-    if ast.is_empty() {
+    let Some((node, remaining_ast)) = ast.split_first() else {
         return Some(state);
-    }
-
-    let node = ast.first().unwrap();
-    let remaining_ast = ast.get(1..).unwrap_or(&[]);
+    };
 
     match node {
         AstNode::Literal(b) => {
