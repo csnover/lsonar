@@ -168,7 +168,7 @@ fn process_replacement_string(
             }
             ReplToken::CaptureRef(idx) => {
                 let idx = usize::from(idx);
-                if idx == 0 {
+                if idx == 0 || (idx == 1 && captures.is_empty()) {
                     result.extend(full_match.as_ref());
                 } else if idx <= captures.len() {
                     result.extend(captures[idx - 1].as_ref());
