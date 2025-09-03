@@ -1,6 +1,6 @@
 #![allow(clippy::single_range_in_vec_init)]
 
-use super::{Capture, MatchRanges, find_first_match};
+use super::{CaptureRange, MatchRanges, find_first_match};
 use crate::{Result, ast::parse_pattern};
 use std::ops::Range;
 
@@ -14,7 +14,7 @@ fn assert_match(
     pattern: &[u8],
     text: &[u8],
     expected_full: Range<usize>,
-    expected_captures: &[Capture],
+    expected_captures: &[CaptureRange],
 ) {
     let result = find(pattern, text).expect("find failed");
     match result {
@@ -151,7 +151,7 @@ fn test_captures_simple_engine() {
         b"()(b)",
         b"b",
         0..1,
-        &[Capture::Position(0), Capture::Range(0..1)],
+        &[CaptureRange::Position(0), CaptureRange::Range(0..1)],
     );
 }
 
@@ -216,7 +216,7 @@ fn test_empty_engine() {
     assert_match(b"a*", b"", 0..0, &[]);
     assert_no_match(b"a+", b"");
     assert_match(b"a?", b"", 0..0, &[]);
-    assert_match(b"()", b"", 0..0, &[Capture::Position(0)]);
+    assert_match(b"()", b"", 0..0, &[CaptureRange::Position(0)]);
 }
 
 #[test]

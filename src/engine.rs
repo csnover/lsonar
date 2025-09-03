@@ -1,81 +1,11 @@
+use super::{
+    LUA_MAXCAPTURES,
+    ast::{AstNode, AstRoot, Quantifier},
+};
 use std::{borrow::Cow, ops::Range};
 
-use super::ast::{AstNode, AstRoot, Quantifier};
-use state::{MAX_RECURSION_DEPTH, State};
-
-mod state;
 #[cfg(test)]
 mod tests;
-
-/// A capture group.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Capture {
-    /// A substring capture group.
-    Range(Range<usize>),
-    /// A current string position capture group.
-    Position(usize),
-}
-
-impl Capture {
-    #[must_use]
-    pub fn into_bytes(self, text: &[u8]) -> Cow<'_, [u8]> {
-        match self {
-            Capture::Range(range) => Cow::Borrowed(&text[range]),
-            Capture::Position(at) => Cow::Owned(
-                format!(
-                    "{}",
-                    if cfg!(feature = "1-based") {
-                        at.saturating_add(1)
-                    } else {
-                        at
-                    }
-                )
-                .into_bytes(),
-            ),
-        }
-    }
-}
-
-impl Default for Capture {
-    fn default() -> Self {
-        Self::Range(<_>::default())
-    }
-}
-
-// TODO: This is only required for unit tests.
-impl From<Range<usize>> for Capture {
-    fn from(value: Range<usize>) -> Self {
-        Self::Range(value)
-    }
-}
-
-// TODO: This is only required for unit tests.
-impl PartialEq<Range<usize>> for Capture {
-    fn eq(&self, other: &Range<usize>) -> bool {
-        match self {
-            Capture::Range(range) => range == other,
-            Capture::Position(_) => false,
-        }
-    }
-}
-
-/// The ranged indexes of a matched pattern. These are always 0-indexed.
-#[derive(Debug, Eq, PartialEq)]
-pub struct MatchRanges {
-    /// The full range of the matched pattern.
-    pub full_match: Range<usize>,
-    /// The ranges of each captured group. If a group did not capture anything,
-    /// the range will be empty.
-    pub captures: Vec<Capture>,
-}
-
-// TODO: This exists only to avoid having to spend a bunch of time changing the
-// unit tests
-impl PartialEq<(Range<usize>, Vec<Capture>)> for MatchRanges {
-    fn eq(&self, other: &(Range<usize>, Vec<Capture>)) -> bool {
-        self.full_match == other.0 && self.captures == other.1
-    }
-}
 
 /// Tries to find the first match of the pattern in the input string,
 /// starting the search at `start_index` (0-based).
@@ -187,9 +117,9 @@ fn match_recursive<'a>(ast: &[AstNode], mut state: State<'a>) -> Option<State<'a
 
             if let Some(mut success_state) = match_recursive(inner, state.clone()) {
                 success_state.captures[capture_index] = if inner.is_empty() {
-                    Capture::Position(start_pos)
+                    CaptureRange::Position(start_pos)
                 } else {
-                    Capture::Range(start_pos..success_state.current_pos)
+                    CaptureRange::Range(start_pos..success_state.current_pos)
                 };
 
                 if let Some(final_state) = match_recursive(remaining_ast, success_state) {
@@ -323,5 +253,134 @@ fn match_non_greedy_quantifier<'a>(
         } else {
             return None;
         }
+    }
+}
+
+#[derive(Clone)]
+struct State<'a> {
+    input: &'a [u8],
+    current_pos: usize,
+    search_start_pos: usize,
+    captures: [CaptureRange; LUA_MAXCAPTURES],
+    recursion_depth: u32,
+}
+
+const MAX_RECURSION_DEPTH: u32 = 500;
+
+impl<'a> State<'a> {
+    fn new(input_slice: &'a [u8], start_pos: usize) -> Self {
+        Self {
+            input: input_slice,
+            current_pos: start_pos,
+            search_start_pos: start_pos,
+            captures: <_>::default(),
+            recursion_depth: 0,
+        }
+    }
+
+    #[inline]
+    fn current_byte(&self) -> Option<u8> {
+        self.input.get(self.current_pos).copied()
+    }
+
+    #[inline]
+    fn previous_byte(&self) -> Option<u8> {
+        if self.current_pos > 0 {
+            self.input.get(self.current_pos - 1).copied()
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    fn check_class(&self, class_byte: u8, negated: bool) -> bool {
+        if let Some(byte) = self.current_byte() {
+            let matches = match class_byte {
+                b'a' => byte.is_ascii_alphabetic(),
+                b'c' => byte.is_ascii_control(),
+                b'd' => byte.is_ascii_digit(),
+                b'g' => byte.is_ascii_graphic() && byte != b' ', // Lua's %g excludes space
+                b'l' => byte.is_ascii_lowercase(),
+                b'p' => byte.is_ascii_punctuation(),
+                b's' => byte.is_ascii_whitespace(),
+                b'u' => byte.is_ascii_uppercase(),
+                b'w' => byte.is_ascii_alphanumeric(),
+                b'x' => byte.is_ascii_hexdigit(),
+                _ => false,
+            };
+            matches ^ negated // XOR handles negation
+        } else {
+            false
+        }
+    }
+}
+
+/// A capture group.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum CaptureRange {
+    /// A substring capture group.
+    Range(Range<usize>),
+    /// A current string position capture group.
+    Position(usize),
+}
+
+impl CaptureRange {
+    #[must_use]
+    pub fn into_bytes(self, text: &[u8]) -> Cow<'_, [u8]> {
+        match self {
+            CaptureRange::Range(range) => Cow::Borrowed(&text[range]),
+            CaptureRange::Position(at) => Cow::Owned(
+                format!(
+                    "{}",
+                    if cfg!(feature = "1-based") {
+                        at.saturating_add(1)
+                    } else {
+                        at
+                    }
+                )
+                .into_bytes(),
+            ),
+        }
+    }
+}
+
+impl Default for CaptureRange {
+    fn default() -> Self {
+        Self::Range(<_>::default())
+    }
+}
+
+// TODO: This is only required for unit tests.
+impl From<Range<usize>> for CaptureRange {
+    fn from(value: Range<usize>) -> Self {
+        Self::Range(value)
+    }
+}
+
+// TODO: This is only required for unit tests.
+impl PartialEq<Range<usize>> for CaptureRange {
+    fn eq(&self, other: &Range<usize>) -> bool {
+        match self {
+            CaptureRange::Range(range) => range == other,
+            CaptureRange::Position(_) => false,
+        }
+    }
+}
+
+/// The ranged indexes of a matched pattern. These are always 0-indexed.
+#[derive(Debug, Eq, PartialEq)]
+pub(crate) struct MatchRanges {
+    /// The full range of the matched pattern.
+    pub full_match: Range<usize>,
+    /// The ranges of each captured group. If a group did not capture anything,
+    /// the range will be empty.
+    pub captures: Vec<CaptureRange>,
+}
+
+// TODO: This exists only to avoid having to spend a bunch of time changing the
+// unit tests
+impl PartialEq<(Range<usize>, Vec<CaptureRange>)> for MatchRanges {
+    fn eq(&self, other: &(Range<usize>, Vec<CaptureRange>)) -> bool {
+        self.full_match == other.0 && self.captures == other.1
     }
 }
