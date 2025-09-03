@@ -109,30 +109,22 @@ impl<'a> Parser<'a> {
         };
 
         match token {
-            Token::Literal(b')' | b']')
-            | Token::RParen
+            Token::Percent => Err(Error::InternalError { pos }),
+
+            Token::RParen
             | Token::RBracket
             | Token::Star
             | Token::Plus
-            | Token::Question => Err(Error::UnexpectedToken {
-                pos,
-                lit: token.to_byte(),
-            }),
-            Token::Percent => Err(Error::InternalError { pos }),
-
-            Token::Literal(b) | Token::EscapedLiteral(b) => Ok(AstNode::Literal(b)),
+            | Token::Question
+            | Token::Literal(_)
+            | Token::EscapedLiteral(_) => Ok(AstNode::Literal(token.to_byte())),
             Token::Any => Ok(AstNode::Any),
             Token::Caret => Ok(AstNode::AnchorStart),
             Token::Dollar => Ok(AstNode::AnchorEnd),
             Token::Class(c) => {
                 let negated = c.is_ascii_uppercase();
                 let base_byte = if negated { c.to_ascii_lowercase() } else { c };
-                if [b'a', b'c', b'd', b'g', b'l', b'p', b's', b'u', b'w', b'x'].contains(&base_byte)
-                {
-                    Ok(AstNode::Class(base_byte, negated))
-                } else {
-                    Ok(AstNode::Literal(c))
-                }
+                Ok(AstNode::Class(base_byte, negated))
             }
             Token::LBracket => self.parse_set(),
             Token::LParen => self.parse_capture(),
@@ -159,6 +151,10 @@ impl<'a> Parser<'a> {
             negated = true;
         }
 
+        if self.lexer.consume(Token::RBracket)? {
+            set.add_byte(b']');
+        }
+
         while let Some(PosToken { pos, token }) = self.lexer.until(Token::RBracket)? {
             match token {
                 Token::Class(c) => {
@@ -166,7 +162,7 @@ impl<'a> Parser<'a> {
                         .map_err(|err| Error::CharSet { pos, err })?;
                 }
                 Token::Literal(lit) => {
-                    if self.lexer.consume(Token::Literal(b'-'))? {
+                    if self.lexer.consume(Token::Minus)? {
                         match self.lexer.peek().map(|token| *token) {
                             // [a-]
                             Some(Token::RBracket) => {
@@ -193,9 +189,6 @@ impl<'a> Parser<'a> {
 
         self.lexer.expect(Token::RBracket)?;
 
-        if self.lexer.consume(Token::RBracket)? {
-            set.add_byte(b']');
-        }
 
         if negated {
             set.invert();

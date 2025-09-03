@@ -278,26 +278,26 @@ fn test_quantifiers_lexer() {
     );
     assert_eq!(
         lex_all(b"[*]").unwrap(),
-        vec![Token::LBracket, Token::Literal(b'*'), Token::RBracket]
+        vec![Token::LBracket, Token::Star, Token::RBracket]
     );
     assert_eq!(
         lex_all(b"[+]").unwrap(),
-        vec![Token::LBracket, Token::Literal(b'+'), Token::RBracket]
+        vec![Token::LBracket, Token::Plus, Token::RBracket]
     );
     assert_eq!(
         lex_all(b"[?]").unwrap(),
-        vec![Token::LBracket, Token::Literal(b'?'), Token::RBracket]
+        vec![Token::LBracket, Token::Question, Token::RBracket]
     );
     assert_eq!(
         lex_all(b"[-]").unwrap(),
-        vec![Token::LBracket, Token::Literal(b'-'), Token::RBracket]
+        vec![Token::LBracket, Token::Minus, Token::RBracket]
     );
     assert_eq!(
         lex_all(b"[a-z]").unwrap(),
         vec![
             Token::LBracket,
             Token::Literal(b'a'),
-            Token::Literal(b'-'),
+            Token::Minus,
             Token::Literal(b'z'),
             Token::RBracket
         ]

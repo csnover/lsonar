@@ -5,13 +5,15 @@ use lsonar::{
     lexer::Token,
 };
 
+#[track_caller]
 fn parse_ok(pattern: &[u8]) -> AstRoot {
-    parse_pattern(pattern).unwrap_or_else(|_| {
-        panic!(
-            "Parser failed for pattern: {}",
-            str::from_utf8(pattern).unwrap()
-        )
-    })
+    match parse_pattern(pattern) {
+        Ok(v) => v,
+        Err(e) => panic!(
+            "Parser failed for pattern '{}': {e}",
+            pattern.escape_ascii()
+        ),
+    }
 }
 
 fn quantified(item: AstNode, quantifier: Quantifier) -> AstNode {
@@ -142,10 +144,6 @@ fn test_quantifiers_parser() {
 
 #[test]
 fn test_sets_parser() {
-    assert_eq!(
-        parse_ok(b"[]"),
-        &[AstNode::Set(make_set(&[], &[], &[], false))]
-    );
     assert_eq!(
         parse_ok(b"[abc]"),
         &[AstNode::Set(make_set(b"abc", &[], &[], false))]
@@ -295,6 +293,14 @@ fn test_escaped_rparen_rbracket_without_panic() {
 #[test]
 fn test_throw_parser_errors() {
     assert!(matches!(
+        parse_pattern(b"[]"),
+        Err(Error::ExpectedToken {
+            pos: 2,
+            expected: Token::RBracket,
+            actual: None
+        })
+    ));
+    assert!(matches!(
         parse_pattern(b"xxxx("),
         Err(Error::ExpectedToken {
             pos: 5,
@@ -303,24 +309,12 @@ fn test_throw_parser_errors() {
         })
     ));
     assert!(matches!(
-        parse_pattern(b"xx)"),
-        Err(Error::UnexpectedToken { lit: b')', pos: 2 })
-    ));
-    assert!(matches!(
-        parse_pattern(b"x]"),
-        Err(Error::UnexpectedToken { lit: b']', pos: 1 })
-    ));
-    assert!(matches!(
         parse_pattern(b"["),
         Err(Error::ExpectedToken {
             pos: 1,
             expected: Token::RBracket,
             actual: None
         })
-    ));
-    assert!(matches!(
-        parse_pattern(b"*"),
-        Err(Error::UnexpectedToken { lit: b'*', pos: 0 })
     ));
     assert!(matches!(
         parse_pattern(b"^*"),

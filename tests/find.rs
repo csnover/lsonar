@@ -94,10 +94,11 @@ fn test_find_invalid_pattern() {
             actual: None
         })
     ));
-    assert!(matches!(
-        find(b"abc", b"*", None, false),
-        Err(Error::UnexpectedToken { pos: 0, lit: b'*' })
-    ));
+    assert_eq!(find(b"abc", b"*", None, false), Ok(None));
+    assert_eq!(
+        find(b"*", b"*", None, false),
+        Ok(Some((1, 1, vec![]).into()))
+    );
     assert!(matches!(
         find(b"abc", b"%", None, false),
         Err(Error::UnexpectedEnd { pos: 1 })
