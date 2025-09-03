@@ -2,6 +2,7 @@ use crate::{Result, ast::parse_pattern};
 
 mod iter;
 
+use super::calculate_start_index;
 pub use iter::GMatchIterator;
 
 /// Like Lua
@@ -15,7 +16,7 @@ pub use iter::GMatchIterator;
 /// # Feature flags
 ///
 /// Captured string positions are 1-indexed if the `1-based` feature is enabled.
-pub fn gmatch<'a>(s: &'a [u8], pattern: &[u8]) -> Result<GMatchIterator<'a>> {
+pub fn gmatch<'a>(s: &'a [u8], pattern: &[u8], init: Option<isize>) -> Result<GMatchIterator<'a>> {
     let is_empty_pattern = pattern.is_empty();
 
     let pattern_ast = if is_empty_pattern {
@@ -27,7 +28,7 @@ pub fn gmatch<'a>(s: &'a [u8], pattern: &[u8]) -> Result<GMatchIterator<'a>> {
     Ok(GMatchIterator {
         bytes: s,
         pattern_ast,
-        current_pos: 0,
+        current_pos: calculate_start_index(s.len(), init),
         is_empty_pattern,
     })
 }
