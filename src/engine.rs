@@ -129,7 +129,19 @@ fn match_recursive<'a>(ast: &[AstNode], mut state: State<'a>) -> Option<State<'a
             None
         }
 
-        AstNode::CaptureRef(_) => None,
+        &AstNode::CaptureRef(index) => {
+            // TODO: Error handling needs to be better. It is an error to use
+            // index 0 or index > the total number of capture groups.
+            match &state.captures[usize::from(index - 1)] {
+                &CaptureRange::Position(pos) => state.current_pos == pos,
+                CaptureRange::Range(range) => {
+                    assert!(!range.is_empty());
+                    let here = state.current_pos..(state.current_pos + range.len());
+                    state.input.get(range.clone()) == state.input.get(here)
+                }
+            }
+            .then_some(state)
+        }
 
         AstNode::Balanced(b1, b2) => {
             if state.current_byte() != Some(*b1) {
