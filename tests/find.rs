@@ -104,8 +104,8 @@ fn test_find_invalid_pattern() {
         Err(Error::UnexpectedEnd { pos: 1 })
     ));
     assert!(matches!(
-        find(b"abc", b"%z", None, false),
-        Err(Error::UnknownClass { pos: 0, lit: b'z' })
+        find(b"abc", b"%e", None, false),
+        Err(Error::UnknownClass { pos: 0, lit: b'e' })
     ));
 }
 

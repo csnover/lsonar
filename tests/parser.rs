@@ -365,8 +365,8 @@ fn test_throw_parser_errors() {
         })
     ));
     assert!(matches!(
-        parse_pattern(b"%z"),
-        Err(Error::UnknownClass { pos: 0, lit: b'z' })
+        parse_pattern(b"%e"),
+        Err(Error::UnknownClass { pos: 0, lit: b'e' })
     ));
 
     assert_eq!(parse_ok(b"%1"), &[AstNode::CaptureRef(1)]);

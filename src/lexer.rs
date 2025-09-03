@@ -292,6 +292,7 @@ fn is_class_byte(c: u8) -> bool {
             | b'u'
             | b'w'
             | b'x'
+            | b'z'
             | b'A'
             | b'C'
             | b'D'

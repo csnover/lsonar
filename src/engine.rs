@@ -306,6 +306,7 @@ impl<'a> State<'a> {
                 b'u' => byte.is_ascii_uppercase(),
                 b'w' => byte.is_ascii_alphanumeric(),
                 b'x' => byte.is_ascii_hexdigit(),
+                b'z' => byte == 0,
                 _ => false,
             };
             matches ^ negated // XOR handles negation

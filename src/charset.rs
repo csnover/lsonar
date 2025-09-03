@@ -125,6 +125,9 @@ impl CharSet {
             b'x' => {
                 self.fill([b'0', b'9' + 1, b'A', b'F' + 1, b'a', b'f' + 1], invert);
             }
+            b'z' => {
+                self.fill([0, 1], invert);
+            }
             _ => {
                 return Err(Error::ByteClass(class_byte));
             }
