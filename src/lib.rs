@@ -10,7 +10,7 @@ pub mod lexer;
 mod lua;
 mod parser;
 
-pub use self::lua::{GSub, Match, Repl, find, gmatch, gsub, r#match};
+pub use self::lua::{Capture, GSub, Match, Repl, find, gmatch, gsub, r#match};
 
 /// A pattern string parsing error.
 #[derive(Debug, Eq, thiserror::Error, PartialEq)]

@@ -1,4 +1,4 @@
-use super::{Captures, calculate_start_index};
+use super::{Capture, calculate_start_index};
 use crate::{
     Result,
     ast::parse_pattern,
@@ -17,7 +17,11 @@ use std::borrow::Cow;
 /// # Feature flags
 ///
 /// The input `init` index is 1-indexed if the `1-based` feature is enabled.
-pub fn r#match<'a>(text: &'a [u8], pattern: &[u8], init: Option<isize>) -> Result<Captures<'a>> {
+pub fn r#match<'a>(
+    text: &'a [u8],
+    pattern: &[u8],
+    init: Option<isize>,
+) -> Result<Vec<Capture<'a>>> {
     let byte_len = text.len();
 
     let start_byte_index = calculate_start_index(byte_len, init);

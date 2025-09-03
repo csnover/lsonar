@@ -1,7 +1,7 @@
 use crate::{
     ast::AstRoot,
     engine::{MatchRanges, find_first_match},
-    lua::Captures,
+    lua::Capture,
 };
 use std::borrow::Cow;
 
@@ -13,7 +13,7 @@ pub struct GMatchIterator<'a> {
 }
 
 impl<'a> Iterator for GMatchIterator<'a> {
-    type Item = Captures<'a>;
+    type Item = Vec<Capture<'a>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.current_pos > self.bytes.len() {

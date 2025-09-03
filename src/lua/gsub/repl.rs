@@ -1,7 +1,7 @@
+use crate::lua::Capture;
 use std::borrow::Cow;
 
 type Key<'a> = Cow<'a, [u8]>;
-type Captures<'a> = &'a [Cow<'a, [u8]>];
 
 /// The string replacement strategy to use with [`gsub`](crate::gsub).
 #[derive(Clone, Copy)]
@@ -14,7 +14,7 @@ pub enum Repl<'a> {
     String(&'a [u8]),
     /// This function is called every time a match occurs, with all captured
     /// substrings passed as a slice, in order.
-    Function(&'a dyn Fn(Captures<'_>) -> Option<Vec<u8>>),
+    Function(&'a dyn Fn(&[Capture<'_>]) -> Option<Vec<u8>>),
     /// This function is queried for every match, using the first capture as the
     /// key.
     Table(&'a dyn Fn(Key<'_>) -> Option<Vec<u8>>),

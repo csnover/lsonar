@@ -11,7 +11,8 @@ pub use self::{
 };
 pub use std::borrow::Cow;
 
-pub type Captures<'a> = Vec<Cow<'a, [u8]>>;
+/// The type of a captured string.
+pub type Capture<'a> = Cow<'a, [u8]>;
 
 fn calculate_start_index(text_len: usize, init: Option<isize>) -> usize {
     match init {

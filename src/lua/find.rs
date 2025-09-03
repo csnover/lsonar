@@ -1,4 +1,4 @@
-use super::{Captures, calculate_start_index};
+use super::{Capture, calculate_start_index};
 use crate::{
     Result,
     ast::parse_pattern,
@@ -22,13 +22,13 @@ pub struct Match<'a> {
     pub end: usize,
     /// The captured string slices. If a capture did not result in any value,
     /// it will be an empty slice.
-    pub captures: Captures<'a>,
+    pub captures: Vec<Capture<'a>>,
 }
 
 // TODO: This exists only to avoid having to spend a bunch of time changing the
 // unit tests
-impl<'a> From<(usize, usize, Captures<'a>)> for Match<'a> {
-    fn from((start, end, captures): (usize, usize, Captures<'a>)) -> Self {
+impl<'a> From<(usize, usize, Vec<Capture<'a>>)> for Match<'a> {
+    fn from((start, end, captures): (usize, usize, Vec<Capture<'a>>)) -> Self {
         Self {
             start,
             end,
