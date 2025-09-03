@@ -160,7 +160,7 @@ impl Inner<'_> {
                         Token::Balanced(d1, d2)
                     }
                     b'f' => Token::Frontier,
-                    d @ b'1'..=b'9' => Token::CaptureRef(d - b'0'),
+                    d @ b'0'..=b'9' => Token::CaptureRef(d - b'0'),
                     lit if is_class_byte(lit) => Token::Class(lit),
                     lit if is_escapable_magic_byte(lit) => Token::EscapedLiteral(lit),
                     lit => {

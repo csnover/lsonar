@@ -147,7 +147,7 @@ impl<'a> Parser<'a> {
                 }
             }
             Token::Minus => Ok(AstNode::Literal(b'-')),
-            Token::CaptureRef(n) => Ok(AstNode::CaptureRef(n as usize)),
+            Token::CaptureRef(n) => Ok(AstNode::CaptureRef(n)),
         }
     }
 

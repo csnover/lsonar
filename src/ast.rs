@@ -43,7 +43,7 @@ pub enum AstNode {
     },
     /// A capture reference used in replacement string for [`gsub`](crate::gsub).
     /// `%1`, `%2`, ..., `%9`. This is always a 1-based index.
-    CaptureRef(usize),
+    CaptureRef(u8),
     /// Quantified item group.
     Quantified {
         /// The items being quantified.

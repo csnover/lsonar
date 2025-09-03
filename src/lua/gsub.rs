@@ -112,15 +112,15 @@ pub fn gsub<'a>(
     n: Option<usize>,
 ) -> Result<(Vec<u8>, usize)> {
     let mut generator = GSub::new(pattern, n)?;
-    while let Some((full_match, rest)) = generator.next(s) {
+    while let Some((ref full_match, rest)) = generator.next(s) {
         let replacement = match &mut repl {
-            Repl::String(repl_str) => Some(process_replacement_string(repl_str, &rest)),
+            Repl::String(repl_str) => Some(process_replacement_string(repl_str, full_match, &rest)),
             Repl::Function(f) => {
-                let full_match = &[full_match];
+                let full_match = core::slice::from_ref(full_match);
                 f(if rest.is_empty() { full_match } else { &rest })
             }
             Repl::Table(f) => {
-                let key = rest.first().unwrap_or(&full_match);
+                let key = rest.first().unwrap_or(full_match);
                 f(key.clone())
             }
         };
@@ -150,10 +150,14 @@ pub enum Repl<'a> {
 
 enum ReplToken {
     Literal(u8),
-    CaptureRef(usize),
+    CaptureRef(u8),
 }
 
-fn process_replacement_string(repl: &[u8], captures: &[Cow<'_, [u8]>]) -> Vec<u8> {
+fn process_replacement_string(
+    repl: &[u8],
+    full_match: &Capture<'_>,
+    captures: &[Capture<'_>],
+) -> Vec<u8> {
     let tokens = tokenize_replacement_string(repl);
     let mut result = Vec::with_capacity(tokens.len());
 
@@ -163,7 +167,10 @@ fn process_replacement_string(repl: &[u8], captures: &[Cow<'_, [u8]>]) -> Vec<u8
                 result.push(b);
             }
             ReplToken::CaptureRef(idx) => {
-                if idx <= captures.len() {
+                let idx = usize::from(idx);
+                if idx == 0 {
+                    result.extend(full_match.as_ref());
+                } else if idx <= captures.len() {
                     result.extend(captures[idx - 1].as_ref());
                 }
             }
@@ -180,9 +187,8 @@ fn tokenize_replacement_string(repl: &[u8]) -> Vec<ReplToken> {
     while i < repl.len() {
         if repl[i] == b'%' && i + 1 < repl.len() {
             let next_byte = repl[i + 1];
-            if (b'1'..=b'9').contains(&next_byte) {
-                let capture_idx = (next_byte - b'0') as usize;
-                tokens.push(ReplToken::CaptureRef(capture_idx));
+            if next_byte.is_ascii_digit() {
+                tokens.push(ReplToken::CaptureRef(next_byte - b'0'));
                 i += 2;
             } else if next_byte == b'%' {
                 tokens.push(ReplToken::Literal(b'%'));
