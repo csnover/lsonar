@@ -49,7 +49,7 @@ impl GSub {
     }
 
     /// Advances to the next match in the given input.
-    pub fn next<'a>(&mut self, input: &'a [u8]) -> Option<Vec<Cow<'a, [u8]>>> {
+    pub fn next<'a>(&mut self, input: &'a [u8]) -> Option<(Capture<'a>, Vec<Capture<'a>>)> {
         if self.replacements > 0
             && let Some(ranges) = find_first_match(&self.pattern, input, self.last_pos)
         {
@@ -82,10 +82,18 @@ impl GSub {
         }
     }
 
-    fn captures<'a>(&self, input: &'a [u8], captures: &[CaptureRange]) -> Vec<Cow<'a, [u8]>> {
-        core::iter::once(Cow::Borrowed(&input[self.current.clone()]))
-            .chain(captures.iter().map(|range| range.clone().into_bytes(input)))
-            .collect::<Vec<_>>()
+    fn captures<'a>(
+        &self,
+        input: &'a [u8],
+        captures: &[CaptureRange],
+    ) -> (Capture<'a>, Vec<Capture<'a>>) {
+        (
+            Cow::Borrowed(&input[self.current.clone()]),
+            captures
+                .iter()
+                .map(|range| range.clone().into_bytes(input))
+                .collect::<Vec<_>>(),
+        )
     }
 }
 
@@ -104,14 +112,16 @@ pub fn gsub<'a>(
     n: Option<usize>,
 ) -> Result<(Vec<u8>, usize)> {
     let mut generator = GSub::new(pattern, n)?;
-    while let Some(captures) = generator.next(s) {
+    while let Some((full_match, rest)) = generator.next(s) {
         let replacement = match &mut repl {
-            Repl::String(repl_str) => Some(process_replacement_string(repl_str, &captures[1..])),
-            Repl::Function(f) => f(&captures),
+            Repl::String(repl_str) => Some(process_replacement_string(repl_str, &rest)),
+            Repl::Function(f) => {
+                let full_match = &[full_match];
+                f(if rest.is_empty() { full_match } else { &rest })
+            }
             Repl::Table(f) => {
-                let full_match = captures[0].clone();
-                let key = captures.get(1).cloned().unwrap_or(full_match.clone());
-                f(key)
+                let key = rest.first().unwrap_or(&full_match);
+                f(key.clone())
             }
         };
         generator.replace(s, replacement.as_deref());

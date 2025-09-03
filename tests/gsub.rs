@@ -106,8 +106,8 @@ fn test_function_with_captures() {
                 Some(
                     format!(
                         "{}={}",
-                        str::from_utf8(captures[1].as_ref()).unwrap(),
-                        str::from_utf8(captures[2].as_ref())
+                        str::from_utf8(captures[0].as_ref()).unwrap(),
+                        str::from_utf8(captures[1].as_ref())
                             .unwrap()
                             .parse::<i32>()
                             .unwrap()
