@@ -159,20 +159,8 @@ impl<'a> Parser<'a> {
             negated = true;
         }
 
-        if self.lexer.consume(Token::RBracket)? {
-            if negated {
-                set.invert();
-            }
-            return Ok(AstNode::Set(set));
-        }
-
-        if self.lexer.consume(Token::RBracket)? {
-            set.add_byte(b']');
-        }
-
         while let Some(PosToken { pos, token }) = self.lexer.until(Token::RBracket)? {
             match token {
-                Token::RBracket => break,
                 Token::Class(c) => {
                     set.add_class(c)
                         .map_err(|err| Error::CharSet { pos, err })?;
@@ -204,6 +192,10 @@ impl<'a> Parser<'a> {
         }
 
         self.lexer.expect(Token::RBracket)?;
+
+        if self.lexer.consume(Token::RBracket)? {
+            set.add_byte(b']');
+        }
 
         if negated {
             set.invert();
