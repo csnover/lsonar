@@ -44,7 +44,9 @@ impl GSub {
     /// engine.
     #[must_use]
     pub fn finish(mut self, input: &[u8]) -> (Vec<u8>, usize) {
-        self.result.extend(&input[self.last_pos..]);
+        if let Some(input) = input.get(self.last_pos..) {
+            self.result.extend(input);
+        }
         (self.result, self.found)
     }
 
@@ -75,8 +77,10 @@ impl GSub {
 
         self.last_pos = self.current.end;
 
-        if self.current.is_empty() && self.last_pos < input.len() {
-            self.result.extend(&input[self.last_pos..=self.last_pos]);
+        if self.current.is_empty() {
+            if let Some(input) = input.get(self.last_pos..=self.last_pos) {
+                self.result.extend(input);
+            }
             self.last_pos += 1;
             self.replacements = 1;
         }
