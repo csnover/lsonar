@@ -187,7 +187,10 @@ impl Inner<'_> {
                         return Err(Error::UnexpectedEnd { pos: self.pos });
                     };
                     match next_byte {
-                        byte if is_class_byte(byte) => Token::Class(byte),
+                        byte if is_class_byte(byte) => {
+                            self.advance();
+                            Token::Class(byte)
+                        }
                         byte if is_escapable_magic_byte(byte) => {
                             self.advance();
                             Token::EscapedLiteral(byte)
