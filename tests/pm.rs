@@ -14,7 +14,10 @@ where
 {
     let err = f().expect_err("should fail");
     assert!(
-        format!("{err}").contains(msg),
+        // The original test suite used (of course) Lua to find, which escapes
+        // % as %%. Since we are using Rust string functions here, unescape the
+        // test suite messages manually.
+        format!("{err}").contains(&msg.replace("%%", "%")),
         "'{err}' does not contain '{msg}'"
     );
 }
@@ -165,7 +168,6 @@ fn find_edge_cases() {
 
 #[test]
 fn gsub_dynamic_capture() {
-    #[track_caller]
     fn f1<'a>(s: &'a [u8], p: &[u8]) -> &'a [u8] {
         let (p, ..) = ok(string::gsub(
             p,
@@ -184,7 +186,7 @@ fn gsub_dynamic_capture() {
         let (p, ..) = ok(string::gsub(&p, b"^(^?)", Repl::String(b"%1()"), Some(1)));
         let (p, ..) = ok(string::gsub(&p, b"($?)$", Repl::String(b"()%1"), Some(1)));
         let t = string::r#match(s, &p, None).expect("matched");
-        &s[(to_number::<usize>(&t[1]) - 1)..=to_number::<usize>(t.last().unwrap())]
+        &s[(to_number::<usize>(&t[0]) - 1)..to_number::<usize>(t.last().unwrap()) - 1]
     }
 
     assert_eq!(f1(b"alo alx 123 b\0o b\0o", b"(..*) %1"), &b"b\0o b\0o"[..]);
@@ -319,6 +321,7 @@ fn gsub_empty_533() {
     let sub = b"a  \nbc\t\td";
     let mut i = 1;
     for cap in ok(string::gmatch(sub, b"()%s*()", None)) {
+        let cap = cap.unwrap();
         res.extend(&sub[i - 1..to_number::<usize>(&cap[0]) - 1]);
         res.push(b'-');
         i = to_number::<usize>(&cap[1]);
@@ -608,6 +611,7 @@ fn gmatch_basic() {
     // tests for gmatch
     let mut a = 0;
     for i in ok(string::gmatch(b"abcde", b"()", None)) {
+        let i = i.unwrap();
         let i = to_number::<i32>(&i[0]);
         assert_eq!(i, a + 1);
         a = i;
@@ -616,12 +620,14 @@ fn gmatch_basic() {
 
     let mut t = vec![];
     for w in ok(string::gmatch(b"first second word", b"%w+", None)) {
+        let w = w.unwrap();
         t.push(w[0].to_vec());
     }
     assert_eq!(t, [&b"first"[..], b"second", b"word"]);
 
     let mut t = vec![3, 6, 9];
     for i in ok(string::gmatch(b"xuxx uu ppar r", b"()(.)%2", None)) {
+        let i = i.unwrap();
         assert_eq!(to_number::<i32>(&i[0]), t.remove(0));
     }
     assert!(t.is_empty());
@@ -632,6 +638,7 @@ fn gmatch_basic() {
         b"(%d+)%s*=%s*(%d+)",
         None,
     )) {
+        let ij = ij.unwrap();
         let (i, j) = (&ij[0], &ij[1]);
         t.insert(to_number::<i32>(i), to_number::<i32>(j));
     }
@@ -648,12 +655,14 @@ fn gmatch_init_param() {
     // init parameter in gmatch
     let mut s = 0;
     for k in ok(string::gmatch(b"10 20 30", b"%d+", Some(3))) {
+        let k = k.unwrap();
         s += to_number::<i32>(&k[0]);
     }
     assert_eq!(s, 50);
 
     let mut s = 0;
     for k in ok(string::gmatch(b"11 21 31", b"%d+", Some(-4))) {
+        let k = k.unwrap();
         s += to_number::<i32>(&k[0]);
     }
     assert_eq!(s, 32);
@@ -699,6 +708,7 @@ fn pattern_frontiers() {
 
     let mut a = vec![1, 5, 9, 14, 17];
     for k in ok(string::gmatch(b"alo alo th02 is 1hat", b"()%f[%w%d]", None)) {
+        let k = k.unwrap();
         assert_eq!(a.remove(0), to_number::<i32>(&k[0]));
     }
     assert!(a.is_empty());

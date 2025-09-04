@@ -1,7 +1,6 @@
 use super::{Capture, calculate_start_index};
 use crate::{
     Result,
-    ast::parse_pattern,
     engine::{MatchRanges, find_first_match},
 };
 use std::borrow::Cow;
@@ -26,9 +25,7 @@ pub fn r#match<'a>(
 
     let start_byte_index = calculate_start_index(byte_len, init);
 
-    let ast = parse_pattern(pattern)?;
-
-    Ok(match find_first_match(&ast, text, start_byte_index) {
+    Ok(match find_first_match(text, pattern, start_byte_index)? {
         Some(MatchRanges {
             full_match,
             captures,

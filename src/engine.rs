@@ -1,330 +1,7 @@
 use super::{
-    LUA_MAXCAPTURES,
-    ast::{AstNode, AstRoot, Quantifier},
+    LUA_MAXCAPTURES, {Error, Result},
 };
 use std::{borrow::Cow, ops::Range};
-
-#[cfg(test)]
-mod tests;
-
-/// Tries to find the first match of the pattern in the input string,
-/// starting the search at `start_index` (0-based).
-/// Returns the range of the full match and the ranges of captures if successful.
-#[must_use]
-pub fn find_first_match(
-    pattern_ast: &AstRoot,
-    input: &[u8],
-    start_index: usize,
-) -> Option<MatchRanges> {
-    let input_len = input.len();
-
-    if start_index > input_len {
-        // Lua allows start > len for matching empty patterns at the end
-        // Let the loop handle this. If start_index is way too large, it won't loop.
-    }
-
-    for i in start_index..=input_len {
-        let initial_state = State::new(input, i);
-
-        if let Some(final_state) = match_recursive(pattern_ast, initial_state) {
-            let full_match_range = i..final_state.current_pos;
-            return Some(MatchRanges {
-                full_match: full_match_range,
-                captures: final_state.captures[..pattern_ast.capture_count()].to_vec(),
-            });
-        }
-
-        if let Some(AstNode::AnchorStart) = pattern_ast.first()
-            && i == start_index
-        {
-            break;
-        }
-        // TODO: What is missing here? This is a no-op
-        // if pattern_ast.len() == 1 {
-        //     if let Some(AstNode::AnchorEnd) = pattern_ast.first() {
-        //         if i < input_len {
-        //             continue;
-        //         }
-        //     }
-        // }
-    }
-
-    None
-}
-
-fn match_recursive<'a>(ast: &[AstNode], mut state: State<'a>) -> Option<State<'a>> {
-    if state.recursion_depth > MAX_RECURSION_DEPTH {
-        return None;
-    }
-    state.recursion_depth += 1;
-
-    let Some((node, remaining_ast)) = ast.split_first() else {
-        return Some(state);
-    };
-
-    match node {
-        AstNode::Literal(b) => {
-            if state.current_byte() == Some(*b) {
-                state.current_pos += 1;
-                match_recursive(remaining_ast, state)
-            } else {
-                None
-            }
-        }
-        AstNode::Any => {
-            if state.current_byte().is_some() {
-                state.current_pos += 1;
-                match_recursive(remaining_ast, state)
-            } else {
-                None
-            }
-        }
-        AstNode::Class(c, negated) => {
-            if state.check_class(*c, *negated) {
-                state.current_pos += 1;
-                match_recursive(remaining_ast, state)
-            } else {
-                None
-            }
-        }
-        AstNode::Set(charset) => {
-            if let Some(b) = state.current_byte()
-                && charset.contains(b)
-            {
-                state.current_pos += 1;
-                match_recursive(remaining_ast, state)
-            } else {
-                None
-            }
-        }
-        AstNode::AnchorStart => {
-            if state.current_pos == state.search_start_pos {
-                match_recursive(remaining_ast, state)
-            } else {
-                None
-            }
-        }
-        AstNode::AnchorEnd => {
-            if state.current_pos == state.input.len() {
-                match_recursive(remaining_ast, state)
-            } else {
-                None
-            }
-        }
-        AstNode::Capture { index, inner } => {
-            let start_pos = state.current_pos;
-            let capture_index = *index - 1; // 0-based for [`Vec`] index
-
-            if let Some(mut success_state) = match_recursive(inner, state.clone()) {
-                success_state.captures[capture_index] = if inner.is_empty() {
-                    CaptureRange::Position(start_pos)
-                } else {
-                    CaptureRange::Range(start_pos..success_state.current_pos)
-                };
-
-                if let Some(final_state) = match_recursive(remaining_ast, success_state) {
-                    return Some(final_state);
-                }
-            }
-            None
-        }
-
-        &AstNode::CaptureRef(index) => {
-            // TODO: Error handling needs to be better. It is an error to use
-            // index 0 or index > the total number of capture groups.
-            match &state.captures[usize::from(index - 1)] {
-                &CaptureRange::Position(pos) => state.current_pos == pos,
-                CaptureRange::Range(range) => {
-                    assert!(!range.is_empty());
-                    let here = state.current_pos..(state.current_pos + range.len());
-                    state.input.get(range.clone()) == state.input.get(here)
-                }
-            }
-            .then_some(state)
-        }
-
-        AstNode::Balanced(b1, b2) => {
-            if state.current_byte() != Some(*b1) {
-                return None;
-            }
-
-            let mut balance = 1;
-            let mut pos = state.current_pos + 1;
-            while pos < state.input.len() {
-                if state.input[pos] == *b2 {
-                    balance -= 1;
-                    if balance == 0 {
-                        state.current_pos = pos + 1;
-                        return match_recursive(remaining_ast, state);
-                    }
-                } else if state.input[pos] == *b1 {
-                    balance += 1;
-                }
-                pos += 1;
-            }
-            None
-        }
-
-        AstNode::Frontier(charset) => {
-            let prev_byte_in_set = charset.contains(state.previous_byte().unwrap_or(b'\0'));
-            let next_byte_in_set = charset.contains(state.current_byte().unwrap_or(b'\0'));
-
-            if !prev_byte_in_set && next_byte_in_set {
-                match_recursive(remaining_ast, state)
-            } else {
-                None
-            }
-        }
-
-        AstNode::Quantified { item, quantifier } => {
-            match quantifier {
-                Quantifier::Star | Quantifier::Plus => {
-                    // Greedy *, +
-                    let min_matches = usize::from(*quantifier == Quantifier::Plus);
-                    match_greedy_quantifier(item.as_ref(), remaining_ast, state, min_matches)
-                }
-                Quantifier::Question => {
-                    // Greedy ? (0 or 1)
-                    let item_ast = std::slice::from_ref(item.as_ref());
-                    if let Some(state_after_1) = match_recursive(item_ast, state.clone())
-                        && let Some(final_state) =
-                            match_recursive(remaining_ast, state_after_1.clone())
-                    {
-                        return Some(final_state.clone());
-                    }
-                    match_recursive(remaining_ast, state)
-                }
-                Quantifier::Minus => {
-                    match_non_greedy_quantifier(item.as_ref(), remaining_ast, state)
-                }
-            }
-        }
-    }
-}
-
-fn match_greedy_quantifier<'a>(
-    item: &AstNode,
-    remaining_ast: &[AstNode],
-    initial_state: State<'a>,
-    min_matches: usize,
-) -> Option<State<'a>> {
-    let mut current_state = initial_state;
-    let mut successful_match_states = Vec::new();
-
-    for _ in 0..min_matches {
-        if let Some(next_state) = match_recursive(std::slice::from_ref(item), current_state.clone())
-            && next_state.current_pos != current_state.current_pos
-        {
-            current_state = next_state;
-        } else {
-            return None;
-        }
-    }
-    successful_match_states.push(current_state.clone());
-
-    while let Some(next_state) = match_recursive(std::slice::from_ref(item), current_state.clone())
-    {
-        if next_state.current_pos == current_state.current_pos {
-            successful_match_states.push(next_state.clone());
-        }
-        current_state = next_state;
-        successful_match_states.push(current_state.clone());
-    }
-
-    while !successful_match_states.is_empty() {
-        let state_to_try = successful_match_states.pop()?;
-        if let Some(final_state) = match_recursive(remaining_ast, state_to_try.clone()) {
-            return Some(final_state.clone());
-        }
-    }
-
-    None
-}
-
-fn match_non_greedy_quantifier<'a>(
-    item: &AstNode,
-    remaining_ast: &[AstNode],
-    initial_state: State<'a>,
-) -> Option<State<'a>> {
-    let mut current_state = initial_state;
-
-    loop {
-        if let Some(final_state) = match_recursive(remaining_ast, current_state.clone()) {
-            return Some(final_state.clone());
-        }
-
-        let item_ast = std::slice::from_ref(item);
-        if let Some(next_state) = match_recursive(item_ast, current_state.clone()) {
-            if next_state.current_pos == current_state.current_pos {
-                if let Some(final_state) = match_recursive(remaining_ast, next_state.clone()) {
-                    return Some(final_state.clone());
-                }
-                return None;
-            }
-            current_state = next_state;
-        } else {
-            return None;
-        }
-    }
-}
-
-#[derive(Clone)]
-struct State<'a> {
-    input: &'a [u8],
-    current_pos: usize,
-    search_start_pos: usize,
-    captures: [CaptureRange; LUA_MAXCAPTURES],
-    recursion_depth: u32,
-}
-
-const MAX_RECURSION_DEPTH: u32 = 500;
-
-impl<'a> State<'a> {
-    fn new(input_slice: &'a [u8], start_pos: usize) -> Self {
-        Self {
-            input: input_slice,
-            current_pos: start_pos,
-            search_start_pos: start_pos,
-            captures: <_>::default(),
-            recursion_depth: 0,
-        }
-    }
-
-    #[inline]
-    fn current_byte(&self) -> Option<u8> {
-        self.input.get(self.current_pos).copied()
-    }
-
-    #[inline]
-    fn previous_byte(&self) -> Option<u8> {
-        self.current_pos
-            .checked_sub(1)
-            .and_then(|pos| self.input.get(pos).copied())
-    }
-
-    #[inline]
-    fn check_class(&self, class_byte: u8, negated: bool) -> bool {
-        if let Some(byte) = self.current_byte() {
-            let matches = match class_byte {
-                b'a' => byte.is_ascii_alphabetic(),
-                b'c' => byte.is_ascii_control(),
-                b'd' => byte.is_ascii_digit(),
-                b'g' => byte.is_ascii_graphic() && byte != b' ', // Lua's %g excludes space
-                b'l' => byte.is_ascii_lowercase(),
-                b'p' => byte.is_ascii_punctuation(),
-                b's' => byte.is_ascii_whitespace(),
-                b'u' => byte.is_ascii_uppercase(),
-                b'w' => byte.is_ascii_alphanumeric(),
-                b'x' => byte.is_ascii_hexdigit(),
-                b'z' => byte == 0,
-                _ => false,
-            };
-            matches ^ negated // XOR handles negation
-        } else {
-            false
-        }
-    }
-}
 
 /// A capture group.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -361,23 +38,6 @@ impl Default for CaptureRange {
     }
 }
 
-// TODO: This is only required for unit tests.
-impl From<Range<usize>> for CaptureRange {
-    fn from(value: Range<usize>) -> Self {
-        Self::Range(value)
-    }
-}
-
-// TODO: This is only required for unit tests.
-impl PartialEq<Range<usize>> for CaptureRange {
-    fn eq(&self, other: &Range<usize>) -> bool {
-        match self {
-            CaptureRange::Range(range) => range == other,
-            CaptureRange::Position(_) => false,
-        }
-    }
-}
-
 /// The ranged indexes of a matched pattern. These are always 0-indexed.
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) struct MatchRanges {
@@ -388,10 +48,500 @@ pub(crate) struct MatchRanges {
     pub captures: Vec<CaptureRange>,
 }
 
-// TODO: This exists only to avoid having to spend a bunch of time changing the
-// unit tests
-impl PartialEq<(Range<usize>, Vec<CaptureRange>)> for MatchRanges {
-    fn eq(&self, other: &(Range<usize>, Vec<CaptureRange>)) -> bool {
-        self.full_match == other.0 && self.captures == other.1
+/// Tries to find the first match of the pattern in the input string,
+/// starting the search at `start_index` (0-based).
+/// Returns the range of the full match and the ranges of captures if successful.
+pub fn find_first_match(
+    input: &[u8],
+    pattern: &[u8],
+    start_index: usize,
+) -> Result<Option<MatchRanges>> {
+    let input_len = input.len();
+    let is_anchored = pattern.first().is_some_and(|c| *c == b'^');
+    let pattern = if is_anchored { &pattern[1..] } else { pattern };
+
+    for start in start_index..=input_len {
+        let mut state = State {
+            input,
+            pattern,
+            level: 0,
+            depth: MAX_RECURSION_DEPTH,
+            captures: <_>::default(),
+        };
+
+        if let Some(end) = next_match(&mut state, start, 0)? {
+            let full_match = start..end;
+            return Ok(Some(MatchRanges {
+                full_match,
+                captures: state
+                    .captures
+                    .into_iter()
+                    .take(state.level)
+                    .map(CaptureRange::try_from)
+                    .collect::<Result<_, _>>()?,
+            }));
+        }
+
+        if is_anchored {
+            break;
+        }
+    }
+
+    Ok(None)
+}
+
+/// The main pattern matching function.
+fn next_match(state: &mut State<'_>, mut s: usize, mut p: usize) -> Result<Option<usize>> {
+    if state.depth == 0 {
+        return Err(Error::TooComplex { pos: p });
+    }
+
+    state.depth -= 1;
+
+    // A loop is used to avoid unnecessary recursion. Because the matching
+    // engine tracks recursion explicitly in order to abort pathological cases,
+    // it is not enough to rely on the compiler to set up tail calls anyway.
+    let s = loop {
+        if p == state.pattern.len() {
+            break Some(s);
+        }
+
+        // Special items: captures, anchors, balances, and frontiers
+        match state.pattern[p] {
+            b'(' => {
+                // It is possible we are at the end of an invalid pattern here.
+                let (p, is_position) = if state.pattern.get(p + 1).copied().unwrap_or(b'\0') == b')'
+                {
+                    (p + 2, true)
+                } else {
+                    (p + 1, false)
+                };
+                return state.start_capture(s, p, is_position);
+            }
+            b')' => return state.end_capture(s, p + 1),
+            b'$' => {
+                if p + 1 != state.pattern.len() {
+                    // Literal '$' in pattern, not an anchor. Process it as a
+                    // normal character by allowing code flow to continue.
+                } else if s == state.input.len() {
+                    // Anchor in pattern at the end of input.
+                    break Some(s);
+                } else {
+                    // Anchor in pattern, but not at the end of input.
+                    break None;
+                }
+            }
+            b'%' => match state.pattern.get(p + 1).copied().unwrap_or(b'\0') {
+                b'b' => {
+                    if let Some(next) = state.match_balance(s, p + 2)? {
+                        // Balance sub-match succeeded. Advance input and step
+                        // to the next token.
+                        s = next;
+                        p += 4;
+                        continue;
+                    }
+
+                    // Balanced did not match.
+                    break None;
+                }
+                b'f' => {
+                    // Advance pattern to parse the frontier set.
+                    p += 2;
+                    if state.pattern.get(p).copied().unwrap_or(b'\0') != b'[' {
+                        return Err(Error::IncompleteFrontier { pos: p });
+                    }
+                    let p_after = state.class_end(p)?;
+
+                    // Lua manual: “The beginning and end of the subject are
+                    // handled as if they were the character '\0'.”
+                    let first = if s == 0 { b'\0' } else { state.input[s - 1] };
+                    let last = state.input.get(s).copied().unwrap_or(b'\0');
+
+                    if !state.is_in_set(first, p, p_after - 1)
+                        && state.is_in_set(last, p, p_after - 1)
+                    {
+                        // Matched; advance the pattern and continue.
+                        p = p_after;
+                        continue;
+                    }
+
+                    // Frontier did not match.
+                    break None;
+                }
+                b'0'..=b'9' => {
+                    if let Some(next) = state.match_capture(s, p, state.pattern[p + 1])? {
+                        // Matched; advance the pattern and the input and
+                        // continue.
+                        s = next;
+                        p += 2;
+                        continue;
+                    }
+
+                    // Captured string did not match.
+                    break None;
+                }
+                _ => {
+                    // This is actually a single character class, so handle
+                    // it below.
+                }
+            },
+            _ => {
+                // This is actually a normal character, so handle it below.
+            }
+        }
+
+        // Normal characters and character classes
+        let p_after = state.class_end(p)?;
+        // It is possible the character class is at the end of the pattern.
+        let quantifier = state.pattern.get(p_after).copied().unwrap_or(b'\0');
+        if state.is_single_match(s, p, p_after) {
+            match quantifier {
+                b'?' => {
+                    if let item @ Some(_) = next_match(state, s + 1, p_after + 1)? {
+                        // Matched one item successfully
+                        break item;
+                    }
+
+                    // Matched zero items successfully
+                    p = p_after + 1;
+                    continue;
+                }
+                b'+' | b'*' => {
+                    // For '+', one item was already matched by `single_match`
+                    s = if state.pattern[p_after] == b'+' {
+                        s + 1
+                    } else {
+                        s
+                    };
+
+                    // Match zero or more, greedily
+                    break state.max_expand(s, p, p_after)?;
+                }
+                b'-' => break state.min_expand(s, p, p_after)?,
+                _ => {
+                    // It was not a quantifier after all, but some other
+                    // character literal that matched
+                    s += 1;
+                    p = p_after;
+                    continue;
+                }
+            }
+        }
+
+        // Nothing matched. Is it OK?
+        if [b'*', b'?', b'-'].contains(&quantifier) {
+            p = p_after + 1;
+            continue;
+        }
+
+        // No, it is not OK. This is a failure condition.
+        break None;
+    };
+
+    state.depth += 1;
+    Ok(s)
+}
+
+struct State<'a> {
+    /// The input string to match.
+    input: &'a [u8],
+    /// The pattern to match.
+    pattern: &'a [u8],
+    /// Recursion depth of `full_match`.
+    depth: usize,
+    /// Number of capture groups.
+    level: usize,
+    /// Intermediate capture group states.
+    captures: [CaptureState; LUA_MAXCAPTURES],
+}
+
+impl State<'_> {
+    /// Matches a pattern balance item. If successful, returns the next position
+    /// of the input.
+    fn match_balance(&self, s: usize, p: usize) -> Result<Option<usize>> {
+        if p >= self.pattern.len() - 1 {
+            return Err(Error::MissingBalanceArgs { pos: p });
+        }
+
+        let open = self.pattern[p];
+        // It is possible that we are at the end of the input.
+        if self.input.get(s).copied().unwrap_or(b'\0') != open {
+            return Ok(None);
+        }
+
+        let close = self.pattern[p + 1];
+        let mut count = 1;
+
+        for s in s + 1..self.input.len() {
+            if self.input[s] == close {
+                count -= 1;
+                if count == 0 {
+                    return Ok(Some(s + 1));
+                }
+            } else if self.input[s] == open {
+                count += 1;
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Matches the capture group at the given level to the input string.
+    /// Returns the next position of the input string if successful.
+    fn match_capture(&self, s: usize, p: usize, level: u8) -> Result<Option<usize>> {
+        let range = self.check_capture(p, level)?;
+        let end = s + range.len();
+        Ok((self.input.get(range.clone()) == self.input.get(s..end)).then_some(end))
+    }
+
+    /// Takes as many pattern items as possible and then backs off until either
+    /// the rest of the pattern matches or there are no more items to give back.
+    /// If successful, returns the next position of the input.
+    fn max_expand(&mut self, s: usize, p: usize, p_end: usize) -> Result<Option<usize>> {
+        let mut i = 0;
+        while self.is_single_match(s + i, p, p_end) {
+            i += 1;
+        }
+        while i != usize::MAX {
+            if let result @ Some(_) = next_match(self, s + i, p_end + 1)? {
+                return Ok(result);
+            }
+            i = i.wrapping_sub(1);
+        }
+        Ok(None)
+    }
+
+    /// Takes the fewest number of items possible until the rest of the pattern
+    /// starts to fail to match. If successful, returns the next position of the
+    /// input.
+    fn min_expand(&mut self, mut s: usize, p: usize, p_end: usize) -> Result<Option<usize>> {
+        loop {
+            if let result @ Some(_) = next_match(self, s, p_end + 1)? {
+                break Ok(result);
+            } else if self.is_single_match(s, p, p_end) {
+                s += 1;
+            } else {
+                break Ok(None);
+            }
+        }
+    }
+
+    /// Starts a new capture group. Completes matching the input and returns its
+    /// final position if successful.
+    fn start_capture(&mut self, s: usize, p: usize, is_position: bool) -> Result<Option<usize>> {
+        if self.level >= LUA_MAXCAPTURES {
+            return Err(Error::TooManyCaptures { pos: p });
+        }
+
+        let slot = &mut self.captures[self.level];
+
+        *slot = if is_position {
+            CaptureState::Finished(CaptureRange::Position(s))
+        } else {
+            CaptureState::Pending { start: s }
+        };
+
+        self.level += 1;
+
+        Ok(next_match(self, s, p)?.or_else(|| {
+            self.level -= 1;
+            None
+        }))
+    }
+
+    /// Finalises a new capture group. Completes matching the input and returns
+    /// its final position if successful.
+    fn end_capture(&mut self, s: usize, p: usize) -> Result<Option<usize>> {
+        let level = self.capture_to_close(p)?;
+        self.captures[level].finish(s, p)?;
+
+        Ok(next_match(self, s, p)?.or_else(|| {
+            self.captures[level].revert();
+            None
+        }))
+    }
+
+    /// Returns the index of the highest pending capture group still needing
+    /// finalising.
+    fn capture_to_close(&self, p: usize) -> Result<usize> {
+        for level in (0..self.level).rev() {
+            if matches!(self.captures[level], CaptureState::Pending { .. }) {
+                return Ok(level);
+            }
+        }
+        Err(Error::InvalidPatternCapture { pos: p })
+    }
+
+    /// Ensures the given capture index belongs to a finished capture group and
+    /// returns its range if so.
+    fn check_capture(&self, p: usize, level: u8) -> Result<&Range<usize>> {
+        let (level, oops) = level.overflowing_sub(b'1');
+        let index = usize::from(level);
+        if !oops
+            && index < self.level
+            && let CaptureState::Finished(CaptureRange::Range(range)) = &self.captures[index]
+        {
+            Ok(range)
+        } else {
+            Err(Error::InvalidCaptureIndex {
+                index: usize::from(level.wrapping_add(1)),
+                pos: p,
+            })
+        }
+    }
+
+    /// Finds the end of a character set. Returns the next position of the
+    /// pattern, or an error if the pattern ends before the set is closed.
+    fn class_end(&self, mut p: usize) -> Result<usize> {
+        let c = self.pattern[p];
+        p += 1;
+        Ok(match c {
+            b'%' => {
+                if p == self.pattern.len() {
+                    return Err(Error::EndsWithPercent { pos: p });
+                }
+                p + 1
+            }
+            b'[' => {
+                // It is possible that we are at the end of the pattern.
+                if self.pattern.get(p).copied().unwrap_or(b'\0') == b'^' {
+                    p += 1;
+                }
+
+                loop {
+                    if p == self.pattern.len() {
+                        return Err(Error::EndsWithoutBracket { pos: p });
+                    }
+                    p += 1;
+                    if self.pattern[p - 1] == b'%' && p < self.pattern.len() {
+                        p += 1;
+                    }
+                    // It is possible that we are at the end of the pattern.
+                    if self.pattern.get(p).copied().unwrap_or(b'\0') == b']' {
+                        break;
+                    }
+                }
+
+                p + 1
+            }
+            _ => p,
+        })
+    }
+
+    /// Checks whether the input matches the pattern item at the given range.
+    fn is_single_match(&self, s: usize, p_start: usize, p_end: usize) -> bool {
+        let Some(c) = self.input.get(s).copied() else {
+            return false;
+        };
+        match self.pattern[p_start] {
+            b'.' => true,
+            b'%' => match_class(c, self.pattern[p_start + 1]),
+            b'[' => self.is_in_set(c, p_start, p_end - 1),
+            _ => self.pattern[p_start] == c,
+        }
+    }
+
+    /// Checks whether the given input character matches the character set
+    /// at the given range.
+    fn is_in_set(&self, c: u8, mut p: usize, p_end: usize) -> bool {
+        let mut matched = true;
+        if self.pattern[p + 1] == b'^' {
+            matched = false;
+            p += 1;
+        }
+
+        loop {
+            p += 1;
+            if p == p_end {
+                break !matched;
+            }
+
+            if self.pattern[p] == b'%' {
+                // %w
+                p += 1;
+                if match_class(c, self.pattern[p]) {
+                    break matched;
+                }
+            } else if self.pattern[p + 1] == b'-' && p + 2 < p_end {
+                // [a-z]
+                p += 2;
+                if self.pattern[p - 2] <= c && c <= self.pattern[p] {
+                    break matched;
+                }
+            } else if self.pattern[p] == c {
+                // Literal character
+                break matched;
+            }
+        }
+    }
+}
+
+/// Intermediate state representation of a capture group.
+#[derive(Clone)]
+enum CaptureState {
+    /// The capture group is waiting to be closed.
+    Pending { start: usize },
+    /// The capture group is fully created.
+    Finished(CaptureRange),
+}
+
+impl CaptureState {
+    /// Finalise a ranged capture group.
+    fn finish(&mut self, end: usize, p: usize) -> Result<()> {
+        match self {
+            CaptureState::Pending { start } => {
+                *self = CaptureState::Finished(CaptureRange::Range(*start..end));
+                Ok(())
+            }
+            CaptureState::Finished(..) => Err(Error::InvalidPatternCapture { pos: p }),
+        }
+    }
+
+    /// Roll back a ranged capture group to a pending state.
+    fn revert(&mut self) {
+        if let CaptureState::Finished(CaptureRange::Range(range)) = self {
+            *self = CaptureState::Pending { start: range.start }
+        }
+    }
+}
+
+impl Default for CaptureState {
+    fn default() -> Self {
+        Self::Finished(<_>::default())
+    }
+}
+
+impl TryFrom<CaptureState> for CaptureRange {
+    type Error = Error;
+
+    fn try_from(value: CaptureState) -> Result<Self, Self::Error> {
+        match value {
+            CaptureState::Pending { start } => Err(Error::UnfinishedCapture { pos: start }),
+            CaptureState::Finished(capture_range) => Ok(capture_range),
+        }
+    }
+}
+
+const MAX_RECURSION_DEPTH: usize = 500;
+
+const fn match_class(c: u8, class: u8) -> bool {
+    let matches = match class.to_ascii_lowercase() {
+        b'a' => c.is_ascii_alphabetic(),
+        b'c' => c.is_ascii_control(),
+        b'd' => c.is_ascii_digit(),
+        b'g' => c.is_ascii_graphic(),
+        b'l' => c.is_ascii_lowercase(),
+        b'p' => c.is_ascii_punctuation(),
+        b's' => c.is_ascii_whitespace(),
+        b'u' => c.is_ascii_uppercase(),
+        b'w' => c.is_ascii_alphanumeric(),
+        b'x' => c.is_ascii_hexdigit(),
+        b'z' => c == 0,
+        _ => return c == class,
+    };
+    if class.is_ascii_lowercase() {
+        matches
+    } else {
+        !matches
     }
 }

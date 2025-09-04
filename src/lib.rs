@@ -3,54 +3,34 @@
 #![warn(clippy::pedantic, rust_2018_idioms)]
 #![allow(clippy::too_many_lines)]
 
-pub mod ast;
-pub mod charset;
 mod engine;
-pub mod lexer;
 mod lua;
-mod parser;
 
 pub use self::lua::{Capture, GSub, Match, Repl, find, gmatch, gsub, r#match};
 
 /// A pattern string parsing error.
 #[derive(Debug, Eq, thiserror::Error, PartialEq)]
 pub enum Error {
-    /// The pattern contains an invalid character set range or byte class.
-    #[error("{err} at {pos}")]
-    CharSet { pos: usize, err: charset::Error },
-
-    /// The pattern ends in the middle of a character class.
+    #[error("pattern too complex at {pos}")]
+    TooComplex { pos: usize },
+    #[error("too many captures at {pos}")]
+    TooManyCaptures { pos: usize },
+    #[error("invalid pattern capture at {pos}")]
+    InvalidPatternCapture { pos: usize },
+    #[error("missing '[' after '%f' in pattern at {pos}")]
+    IncompleteFrontier { pos: usize },
+    #[error("malformed pattern (missing arguments to '%b') at {pos}")]
+    MissingBalanceArgs { pos: usize },
+    #[error("invalid capture index %{index} at {pos}")]
+    InvalidCaptureIndex { pos: usize, index: usize },
     #[error("malformed pattern (ends with '%') at {pos}")]
-    UnexpectedEnd { pos: usize },
-
-    /// The pattern contains an unrecognised character class sequence.
-    #[error("invalid escape sequence '%{}' at {pos}", lit.escape_ascii())]
-    UnknownClass { pos: usize, lit: u8 },
-
-    /// The pattern ends in the middle of a balanced pattern item.
-    #[error("missing arguments to '%b' at {pos}")]
-    MissingArgs { pos: usize },
-
-    /// The number of capture groups in the pattern exceeds the supported number
-    /// of captures.
-    #[error("too many captures in pattern ({0} > {LUA_MAXCAPTURES})")]
-    Captures(usize),
-
-    /// A token of an unexpected type was encountered.
-    #[error("unexpected '{}' at {pos}", lit.escape_ascii())]
-    UnexpectedToken { pos: usize, lit: u8 },
-
-    /// A token of an unexpected type was encountered.
-    #[error("expected {expected:?}, got {actual:?} at {pos}")]
-    ExpectedToken {
-        pos: usize,
-        expected: lexer::Token,
-        actual: Option<lexer::Token>,
-    },
-
-    /// The pattern ends in the middle of an item.
-    #[error("unexpected end of pattern at {pos}")]
-    UnexpectedEndOfPattern { pos: usize },
+    EndsWithPercent { pos: usize },
+    #[error("malformed pattern (missing ']') at {pos}")]
+    EndsWithoutBracket { pos: usize },
+    #[error("unfinished capture at {pos}")]
+    UnfinishedCapture { pos: usize },
+    #[error("invalid use of '%' in replacement string")]
+    InvalidReplacement,
 }
 
 /// The standard [`Result`](core::result::Result) type used by lsonar.

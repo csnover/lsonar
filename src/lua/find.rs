@@ -1,7 +1,6 @@
 use super::{Capture, calculate_start_index};
 use crate::{
     Result,
-    ast::parse_pattern,
     engine::{MatchRanges, find_first_match},
 };
 
@@ -96,9 +95,7 @@ pub fn find<'a>(
             Ok(None)
         }
     } else {
-        let ast = parse_pattern(pattern)?;
-
-        match find_first_match(&ast, s, start_byte_index) {
+        match find_first_match(s, pattern, start_byte_index)? {
             Some(MatchRanges {
                 full_match,
                 captures,

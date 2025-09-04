@@ -1,9 +1,12 @@
 use lsonar::{Result, gmatch};
 use std::borrow::Cow;
 
-fn collect_gmatch_results<'a>(text: &'a [u8], pattern: &[u8]) -> Result<Vec<Vec<Cow<'a, [u8]>>>> {
+fn collect_gmatch_results<'a>(
+    text: &'a [u8],
+    pattern: &'a [u8],
+) -> Result<Vec<Vec<Cow<'a, [u8]>>>> {
     let it = gmatch(text, pattern, None)?;
-    Ok(it.collect())
+    it.collect::<Result<_, _>>()
 }
 
 #[test]

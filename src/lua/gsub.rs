@@ -1,7 +1,6 @@
 use super::Capture;
 use crate::{
-    Result,
-    ast::{AstRoot, parse_pattern},
+    Error, Result,
     engine::{CaptureRange, find_first_match},
 };
 use std::{borrow::Cow, ops::Range};
@@ -12,7 +11,7 @@ use std::{borrow::Cow, ops::Range};
 /// allows for iterative replacement of strings by separating the matching and
 /// replacing parts.
 pub struct GSub {
-    pattern: AstRoot,
+    pattern: Vec<u8>,
     replacements: usize,
     found: usize,
     result: Vec<u8>,
@@ -29,10 +28,8 @@ impl GSub {
     /// If the pattern string could not be parsed, an [`Error`](crate::Error) is
     /// returned.
     pub fn new(pattern: &[u8], n: Option<usize>) -> Result<Self> {
-        let ast = parse_pattern(pattern)?;
-
         Ok(Self {
-            pattern: ast,
+            pattern: pattern.to_vec(),
             replacements: n.unwrap_or(usize::MAX),
             found: 0,
             result: Vec::new(),
@@ -53,17 +50,24 @@ impl GSub {
     }
 
     /// Advances to the next match in the given input.
-    pub fn next<'a>(&mut self, input: &'a [u8]) -> Option<(Capture<'a>, Vec<Capture<'a>>)> {
-        if self.replacements > 0
-            && let Some(ranges) = find_first_match(&self.pattern, input, self.last_pos)
-        {
-            self.found += 1;
-            self.replacements -= 1;
-            self.current = ranges.full_match;
-            Some(self.captures(input, &ranges.captures))
-        } else {
-            None
-        }
+    ///
+    /// # Errors
+    ///
+    /// If a syntax error is encountered in the pattern string, an [`Error`] is
+    /// returned.
+    pub fn next<'a>(&mut self, input: &'a [u8]) -> Result<Option<(Capture<'a>, Vec<Capture<'a>>)>> {
+        Ok(
+            if self.replacements > 0
+                && let Some(ranges) = find_first_match(input, &self.pattern, self.last_pos)?
+            {
+                self.found += 1;
+                self.replacements -= 1;
+                self.current = ranges.full_match;
+                Some(self.captures(input, &ranges.captures))
+            } else {
+                None
+            },
+        )
     }
 
     /// Replaces the current match with the given replacement text. If the given
@@ -123,9 +127,11 @@ pub fn gsub<'a>(
     n: Option<usize>,
 ) -> Result<(Vec<u8>, usize)> {
     let mut generator = GSub::new(pattern, n)?;
-    while let Some((ref full_match, rest)) = generator.next(s) {
+    while let Some((ref full_match, rest)) = generator.next(s)? {
         let replacement = match &mut repl {
-            Repl::String(repl_str) => Some(process_replacement_string(repl_str, full_match, &rest)),
+            Repl::String(repl_str) => {
+                Some(process_replacement_string(repl_str, full_match, &rest)?)
+            }
             Repl::Function(f) => {
                 let full_match = core::slice::from_ref(full_match);
                 f(if rest.is_empty() { full_match } else { &rest })
@@ -168,8 +174,8 @@ fn process_replacement_string(
     repl: &[u8],
     full_match: &Capture<'_>,
     captures: &[Capture<'_>],
-) -> Vec<u8> {
-    let tokens = tokenize_replacement_string(repl);
+) -> Result<Vec<u8>> {
+    let tokens = tokenize_replacement_string(repl)?;
     let mut result = Vec::with_capacity(tokens.len());
 
     for token in tokens {
@@ -183,36 +189,33 @@ fn process_replacement_string(
                     result.extend(full_match.as_ref());
                 } else if idx <= captures.len() {
                     result.extend(captures[idx - 1].as_ref());
+                } else {
+                    return Err(Error::InvalidCaptureIndex { pos: 0, index: idx });
                 }
             }
         }
     }
 
-    result
+    Ok(result)
 }
 
-fn tokenize_replacement_string(repl: &[u8]) -> Vec<ReplToken> {
+fn tokenize_replacement_string(repl: &[u8]) -> Result<Vec<ReplToken>> {
     let mut tokens = Vec::new();
     let mut i = 0;
 
     while i < repl.len() {
         if repl[i] == b'%' && i + 1 < repl.len() {
-            let next_byte = repl[i + 1];
-            if next_byte.is_ascii_digit() {
-                tokens.push(ReplToken::CaptureRef(next_byte - b'0'));
-                i += 2;
-            } else if next_byte == b'%' {
-                tokens.push(ReplToken::Literal(b'%'));
-                i += 2;
-            } else {
-                tokens.push(ReplToken::Literal(b'%'));
-                i += 1;
-            }
+            tokens.push(match repl[i + 1] {
+                next_byte if next_byte.is_ascii_digit() => ReplToken::CaptureRef(next_byte - b'0'),
+                next_byte @ b'%' => ReplToken::Literal(next_byte),
+                _ => return Err(Error::InvalidReplacement),
+            });
+            i += 2;
         } else {
             tokens.push(ReplToken::Literal(repl[i]));
             i += 1;
         }
     }
 
-    tokens
+    Ok(tokens)
 }

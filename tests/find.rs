@@ -1,4 +1,4 @@
-use lsonar::{Error, find, lexer::Token};
+use lsonar::{Error, find};
 
 #[test]
 fn test_negative_byte_classes() {
@@ -80,19 +80,11 @@ fn test_balanced_patterns() {
 fn test_find_invalid_pattern() {
     assert!(matches!(
         find(b"abc", b"[", None, false),
-        Err(Error::ExpectedToken {
-            pos: 1,
-            expected: Token::RBracket,
-            actual: None
-        })
+        Err(Error::EndsWithoutBracket { pos: 1 })
     ));
     assert!(matches!(
         find(b"abc", b"(", None, false),
-        Err(Error::ExpectedToken {
-            pos: 1,
-            expected: Token::RParen,
-            actual: None
-        })
+        Err(Error::UnfinishedCapture { pos: 0 })
     ));
     assert_eq!(find(b"abc", b"*", None, false), Ok(None));
     assert_eq!(
@@ -101,11 +93,7 @@ fn test_find_invalid_pattern() {
     );
     assert!(matches!(
         find(b"abc", b"%", None, false),
-        Err(Error::UnexpectedEnd { pos: 1 })
-    ));
-    assert!(matches!(
-        find(b"abc", b"%e", None, false),
-        Err(Error::UnknownClass { pos: 0, lit: b'e' })
+        Err(Error::EndsWithPercent { pos: 1 })
     ));
 }
 
