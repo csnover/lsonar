@@ -219,8 +219,6 @@ pub enum Token {
     Question,
     /// `-`. Shortest match quantifier.
     Minus,
-    /// `%`. Used for escapes like `%%`, `%b`, `%f`.
-    Percent,
     /// `%bxy`. `x` and `y` are stored.
     Balanced(u8, u8),
     /// `%f`
@@ -247,7 +245,6 @@ impl Token {
             Token::Plus => b'+',
             Token::Question => b'?',
             Token::Minus => b'-',
-            Token::Percent => b'%',
             Token::Class(c) => c,
             Token::Balanced(_, _) => b'b',
             Token::Frontier => b'f',

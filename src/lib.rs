@@ -51,10 +51,6 @@ pub enum Error {
     /// The pattern ends in the middle of an item.
     #[error("unexpected end of pattern at {pos}")]
     UnexpectedEndOfPattern { pos: usize },
-
-    /// A bug occurred!
-    #[error("internal error: percent token should not reach parser base")]
-    InternalError { pos: usize },
 }
 
 /// The standard [`Result`](core::result::Result) type used by lsonar.
