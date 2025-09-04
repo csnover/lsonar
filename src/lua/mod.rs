@@ -20,8 +20,9 @@ fn calculate_start_index(text_len: usize, init: Option<isize>) -> usize {
             let i = if cfg!(feature = "1-based") { i - 1 } else { i };
             // Clippy: Precondition `i > 0` guarantees no sign loss
             #[allow(clippy::cast_sign_loss)]
-            let i = i as usize;
-            if i >= text_len { text_len } else { i }
+            {
+                i as usize
+            }
         }
         Some(i) if i < 0 => {
             let abs_i = i.unsigned_abs();
