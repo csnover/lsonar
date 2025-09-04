@@ -69,36 +69,30 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_item(&mut self) -> Result<AstNode> {
-        let mut base_item = self.parse_base()?;
+        let base = self.parse_base()?;
 
-        let quantifier = match self.lexer.peek().map(|t| t.token) {
-            Some(Token::Star) => Some(Quantifier::Star),
-            Some(Token::Plus) => Some(Quantifier::Plus),
-            Some(Token::Question) => Some(Quantifier::Question),
-            Some(Token::Minus) => Some(Quantifier::Minus),
-            _ => None,
+        let Some(token) = self.lexer.peek().map(|t| t.token) else {
+            return Ok(base);
         };
 
-        if let Some(quantifier) = quantifier {
-            let PosToken { pos, token } = self.lexer.next().unwrap().unwrap();
+        let quantifier = match token {
+            Token::Star => Quantifier::Star,
+            Token::Plus => Quantifier::Plus,
+            Token::Question => Quantifier::Question,
+            Token::Minus => Quantifier::Minus,
+            _ => return Ok(base),
+        };
 
-            match base_item {
-                AstNode::AnchorStart | AstNode::AnchorEnd | AstNode::Frontier(_) => {
-                    return Err(Error::UnexpectedToken {
-                        pos,
-                        lit: token.to_byte(),
-                    })?;
+        Ok(match base {
+            AstNode::Any | AstNode::Class(..) | AstNode::Literal(..) | AstNode::Set(..) => {
+                self.lexer.next()?;
+                AstNode::Quantified {
+                    item: Box::new(base),
+                    quantifier,
                 }
-                _ => {}
             }
-
-            base_item = AstNode::Quantified {
-                item: Box::new(base_item),
-                quantifier,
-            };
-        }
-
-        Ok(base_item)
+            base => base,
+        })
     }
 
     fn parse_base(&mut self) -> Result<AstNode> {
@@ -109,8 +103,6 @@ impl<'a> Parser<'a> {
         };
 
         match token {
-            Token::Percent => Err(Error::InternalError { pos }),
-
             Token::RParen
             | Token::RBracket
             | Token::Star

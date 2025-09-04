@@ -157,16 +157,15 @@ fn test_captures_simple_engine() {
 
 #[test]
 fn test_captures_quantified_engine() {
-    assert_match(b"(a)*", b"aaa", 0..3, &[(2..3).into()]);
-    assert_match(b"(a)+", b"aaa", 0..3, &[(2..3).into()]);
-    assert_match(b"(a)?", b"a", 0..1, &[(0..1).into()]);
-    assert_match(b"(a)?", b"", 0..0, &[<_>::default()]);
-    assert_match(b"a(b)*c", b"abbbc", 0..5, &[(3..4).into()]);
-    assert_match(b"a(b)+c", b"abbbc", 0..5, &[(3..4).into()]);
-    assert_match(b"a(b)?c", b"abc", 0..3, &[(1..2).into()]);
-    assert_match(b"a(b)?c", b"ac", 0..2, &[<_>::default()]);
-    assert_match(b"a(b)-c", b"abbbc", 0..5, &[(3..4).into()]);
-    assert_match(b"a(b)-c", b"abbbc", 0..5, &[(3..4).into()]);
+    assert_match(b"(a*)", b"aaa", 0..3, &[(0..3).into()]);
+    assert_match(b"(a+)", b"aaa", 0..3, &[(0..3).into()]);
+    assert_match(b"(a?)", b"a", 0..1, &[(0..1).into()]);
+    assert_match(b"(a?)", b"", 0..0, &[<_>::default()]);
+    assert_match(b"a(b*)c", b"abbbc", 0..5, &[(1..4).into()]);
+    assert_match(b"a(b+)c", b"abbbc", 0..5, &[(1..4).into()]);
+    assert_match(b"a(b?)c", b"abc", 0..3, &[(1..2).into()]);
+    assert_match(b"a(b?)c", b"ac", 0..2, &[(1..1).into()]);
+    assert_match(b"a(b-)c", b"abbbc", 0..5, &[(1..4).into()]);
 }
 
 #[test]
@@ -202,7 +201,6 @@ fn test_frontier_engine() {
 fn test_backtracking_engine() {
     assert_no_match(b"a*b", b"aaac");
     assert_no_match(b"a+b", b"aaac");
-    assert_match(b"(ab)+a", b"abab", 0..3, &[(0..2).into()]);
     assert_match(b"(a*)b", b"aaab", 0..4, &[(0..3).into()]);
     assert_match(b"(a+)b", b"aaab", 0..4, &[(0..3).into()]);
     assert_match(b"a[bc]+d", b"abbcd", 0..5, &[]);
@@ -350,18 +348,17 @@ fn test_pattern_with_utf8_content_engine() {
 
 #[test]
 fn test_quantifiers_with_capturing_groups_engine() {
-    assert_match(b"(a)+", b"aaa", 0..3, &[(2..3).into()]);
-    assert_match(b"(ab)+", b"ababab", 0..6, &[(4..6).into()]);
-    assert_match(b"(a)*", b"aaa", 0..3, &[(2..3).into()]);
-    assert_match(b"(a)*", b"", 0..0, &[(0..0).into()]);
-    assert_match(b"(a)?", b"a", 0..1, &[(0..1).into()]);
-    assert_match(b"(a)?", b"", 0..0, &[(0..0).into()]);
-    assert_match(b"(a)-", b"aaa", 0..0, &[(0..0).into()]);
+    assert_match(b"(a+)", b"aaa", 0..3, &[(0..3).into()]);
+    assert_match(b"(a*)", b"aaa", 0..3, &[(0..3).into()]);
+    assert_match(b"(a*)", b"", 0..0, &[(0..0).into()]);
+    assert_match(b"(a?)", b"a", 0..1, &[(0..1).into()]);
+    assert_match(b"(a?)", b"", 0..0, &[(0..0).into()]);
+    assert_match(b"(a-)", b"aaa", 0..0, &[(0..0).into()]);
 }
 
 #[test]
 fn test_edge_cases_and_backtracking_engine() {
-    assert_match(b"(a+)+", b"aaa", 0..3, &[(0..3).into()]);
+    assert_match(b"(a+)", b"aaa", 0..3, &[(0..3).into()]);
     assert_match(b"[ab][cd]", b"ac", 0..2, &[]);
     assert_match(b"[ab][cd]", b"bd", 0..2, &[]);
     assert_no_match(b"[ab][cd]", b"ab");
@@ -378,7 +375,7 @@ fn test_edge_cases_and_backtracking_engine() {
 #[test]
 fn test_real_world_patterns_advanced_engine() {
     let html = b"<div class='item'><span>Product: </span>Laptop</div><div class='price'>$999</div>";
-    let pattern = b"<div class='([^']+)'>([^<]*<span>[^<]*</span>)?([^<]*)</div>";
+    let pattern = b"<div class='([^']+)'>([^<]*<span>[^<]*</span>)([^<]*)</div>";
 
     let result = find(pattern, html).unwrap().unwrap();
     let MatchRanges {
