@@ -169,28 +169,25 @@ impl<'a> Parser<'a> {
                     set.add_class(c)
                         .map_err(|err| Error::CharSet { pos, err })?;
                 }
-                Token::Literal(lit) => {
+                b => {
                     if self.lexer.consume(Token::Minus)? {
                         match self.lexer.peek().map(|token| *token) {
                             // [a-]
                             Some(Token::RBracket) => {
-                                set.add_byte(lit);
+                                set.add_byte(b.to_byte());
                                 set.add_byte(b'-');
                             }
-                            // [a-z]
-                            Some(Token::Literal(range_end)) => {
+                            // [a-z] (or even [!-/] if you want, but not [!-%]!)
+                            Some(next) if !matches!(next, Token::Class(_)) => {
                                 self.lexer.next()?;
-                                set.add_range(lit, range_end)
+                                set.add_range(b.to_byte(), next.to_byte())
                                     .map_err(|err| Error::CharSet { pos, err })?;
                             }
-                            _ => set.add_byte(lit),
+                            _ => set.add_byte(b.to_byte()),
                         }
                     } else {
-                        set.add_byte(lit);
+                        set.add_byte(b.to_byte());
                     }
-                }
-                _ => {
-                    set.add_byte(token.to_byte());
                 }
             }
         }
