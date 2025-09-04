@@ -195,7 +195,7 @@ fn test_frontier_engine() {
     assert_no_match(b"%f[%s]a", b" a");
 
     assert_match(b"%f[a]a", b"a", 0..1, &[]);
-    assert_match(b"%f[^a]b", b"b", 0..1, &[]);
+    assert_no_match(b"%f[^a]b", b"b");
 }
 
 #[test]

@@ -166,8 +166,8 @@ fn match_recursive<'a>(ast: &[AstNode], mut state: State<'a>) -> Option<State<'a
         }
 
         AstNode::Frontier(charset) => {
-            let prev_byte_in_set = state.previous_byte().is_some_and(|b| charset.contains(b));
-            let next_byte_in_set = state.current_byte().is_some_and(|b| charset.contains(b));
+            let prev_byte_in_set = charset.contains(state.previous_byte().unwrap_or(b'\0'));
+            let next_byte_in_set = charset.contains(state.current_byte().unwrap_or(b'\0'));
 
             if !prev_byte_in_set && next_byte_in_set {
                 match_recursive(remaining_ast, state)
