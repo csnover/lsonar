@@ -17,6 +17,7 @@ pub struct GSub {
     found: usize,
     result: Vec<u8>,
     last_pos: usize,
+    last_replace: usize,
     current: Range<usize>,
 }
 
@@ -36,6 +37,7 @@ impl GSub {
             found: 0,
             result: Vec::new(),
             last_pos: 0,
+            last_replace: usize::MAX,
             current: 0..0,
         })
     }
@@ -67,14 +69,17 @@ impl GSub {
     /// Replaces the current match with the given replacement text. If the given
     /// replacement is `None`, the original match is kept in the string.
     pub fn replace(&mut self, input: &[u8], replacement: Option<&[u8]>) {
-        self.result
-            .extend(&input[self.last_pos..self.current.start]);
-        if let Some(replacement) = replacement {
-            self.result.extend(replacement);
-        } else {
-            self.result.extend(&input[self.current.clone()]);
+        if self.current.end != self.last_replace {
+            self.result
+                .extend(&input[self.last_pos..self.current.start]);
+            if let Some(replacement) = replacement {
+                self.result.extend(replacement);
+            } else {
+                self.result.extend(&input[self.current.clone()]);
+            }
         }
 
+        self.last_replace = self.current.end;
         self.last_pos = self.current.end;
 
         if self.current.is_empty() {
@@ -82,7 +87,9 @@ impl GSub {
                 self.result.extend(input);
             }
             self.last_pos += 1;
-            self.replacements = 1;
+            if self.last_pos == input.len() {
+                self.replacements = 1;
+            }
         }
     }
 
